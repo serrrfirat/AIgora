@@ -1,0 +1,17 @@
+{
+  "name": "debate-workspace",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": [
+    "debate-agent"
+  ],
+  "scripts": {
+    "build": "pnpm -r build",
+    "start": "pnpm --filter @ai16z/agent start"
+  },
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=8"
+  }
+} 
