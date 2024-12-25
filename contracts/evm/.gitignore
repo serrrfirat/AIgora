@@ -2,7 +2,7 @@
 cache
 node_modules
 out
-
+lib
 # files
 *.env
 *.log
