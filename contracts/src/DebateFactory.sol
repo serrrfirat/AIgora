@@ -1,22 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import "solady/auth/Ownable.sol";
+import "solady/utils/LibString.sol";
 import "./Debate.sol";
 
 /**
  * @title DebateFactory
  * @notice Factory contract for creating new Debate instances with ERC20 token support
  */
-contract DebateFactory is AccessControl {
-    using Counters for Counters.Counter;
-    
-    bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
-    Counters.Counter private _debateCounter;
-    
+contract DebateFactory is Ownable {
     struct DebateConfig {
         uint256 bondingTarget;     // Target amount for bonding curve completion (in token decimals)
         uint256 bondingDuration;   // Duration of bonding period in seconds
@@ -35,6 +28,7 @@ contract DebateFactory is AccessControl {
     mapping(address => bool) public verifiedDebates;
     mapping(address => TokenInfo) public supportedTokens;
     address[] public allDebates;
+    uint256 private _debateCounter;
     
     event DebateCreated(
         address indexed debateAddress,
@@ -52,8 +46,7 @@ contract DebateFactory is AccessControl {
     );
     
     constructor() {
-        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _setupRole(OPERATOR_ROLE, msg.sender);
+        _initializeOwner(msg.sender);
         
         // Set default configuration (using 18 decimals as base)
         defaultConfig = DebateConfig({
@@ -64,19 +57,21 @@ contract DebateFactory is AccessControl {
         });
     }
     
-    function addSupportedToken(address tokenAddress) 
-        external 
-        onlyRole(OPERATOR_ROLE) 
-    {
+    function addSupportedToken(address tokenAddress) external onlyOwner {
         require(tokenAddress != address(0), "Invalid token address");
         require(!supportedTokens[tokenAddress].isValid, "Token already supported");
         
-        IERC20Metadata token = IERC20Metadata(tokenAddress);
-        
-        // This will revert if the token doesn't implement the metadata interface
-        string memory name = token.name();
-        string memory symbol = token.symbol();
-        uint8 decimals = token.decimals();
+        (bool success, bytes memory data) = tokenAddress.staticcall(abi.encodeWithSignature("name()"));
+        require(success, "Token must implement name");
+        string memory name = abi.decode(data, (string));
+
+        (success, data) = tokenAddress.staticcall(abi.encodeWithSignature("symbol()"));
+        require(success, "Token must implement symbol");
+        string memory symbol = abi.decode(data, (string));
+
+        (success, data) = tokenAddress.staticcall(abi.encodeWithSignature("decimals()"));
+        require(success, "Token must implement decimals");
+        uint8 decimals = abi.decode(data, (uint8));
         
         supportedTokens[tokenAddress] = TokenInfo({
             name: name,
@@ -88,10 +83,7 @@ contract DebateFactory is AccessControl {
         emit TokenAdded(tokenAddress, name, symbol, decimals);
     }
     
-    function updateDefaultConfig(DebateConfig calldata newConfig) 
-        external 
-        onlyRole(DEFAULT_ADMIN_ROLE) 
-    {
+    function updateDefaultConfig(DebateConfig calldata newConfig) external onlyOwner {
         require(newConfig.minimumDuration >= 1 hours, "Duration too short");
         require(newConfig.bondingDuration < newConfig.minimumDuration, "Invalid bonding duration");
         defaultConfig = newConfig;
@@ -132,19 +124,23 @@ contract DebateFactory is AccessControl {
             duration,
             config.bondingTarget,
             config.bondingDuration,
-            config.basePrice
+            config.basePrice,
+            5 // Default number of rounds
         );
         
         verifiedDebates[address(newDebate)] = true;
         allDebates.push(address(newDebate));
         
-        _debateCounter.increment();
+        unchecked {
+            _debateCounter++;
+        }
+        
         emit DebateCreated(
             address(newDebate), 
             topic, 
             msg.sender, 
             tokenAddress,
-            _debateCounter.current()
+            _debateCounter
         );
         
         return address(newDebate);
@@ -165,19 +161,19 @@ contract DebateFactory is AccessControl {
     }
 
     function getDebateCount() external view returns (uint256) {
-        return _debateCounter.current();
+        return _debateCounter;
     }
 
     function isVerifiedDebate(address debateAddress) external view returns (bool) {
         return verifiedDebates[debateAddress];
     }
 
-    function getTokenInfo(address token) 
-        external 
-        view 
-        returns (TokenInfo memory) 
-    {
+    function getTokenInfo(address token) external view returns (TokenInfo memory) {
         require(supportedTokens[token].isValid, "Token not supported");
         return supportedTokens[token];
+    }
+
+    function getAllDebates() external view returns (address[] memory) {
+        return allDebates;
     }
 }

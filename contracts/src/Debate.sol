@@ -1,19 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
-
+import "solady/auth/Ownable.sol";
+import "solady/utils/SafeTransferLib.sol";
+import "solady/utils/LibString.sol";
+import "solady/tokens/ERC20.sol";
+import { ERC20, OwnableRoles, ReentrancyGuard, Initializable } from "solady/Milady.sol";
 /**
  * @title Debate
  * @notice A contract for managing AI-driven debates with betting and bonding curve mechanics
  * @dev Implements debate rounds, AI scoring, bonding curve, and reward distribution
  */
-contract Debate is ReentrancyGuard, AccessControl {
-    using Counters for Counters.Counter;
-
+contract Debate is ReentrancyGuard, OwnableRoles, Initializable {
     // Constants
     uint256 public constant MAX_SCORE = 10;
     uint256 public constant MIN_SCORE = 1;
@@ -53,7 +51,6 @@ contract Debate is ReentrancyGuard, AccessControl {
     // State Variables
     string public topic;
     address public creator;
-    IERC20 public token;
     uint256 public debateEndTime;
     uint256 public currentRound;
     uint256 public totalRounds;
