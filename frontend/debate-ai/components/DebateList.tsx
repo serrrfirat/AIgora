@@ -1,3 +1,5 @@
+'use client';
+
 import { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 import Link from 'next/link';
@@ -115,7 +117,7 @@ function DebateCard({ debate }: DebateCardProps) {
             {ethers.formatEther(debate.bondingCurve.target)} tokens
           </p>
         </div>
-        <Link href={`/debate/${debate.address}`}>
+        <Link href={`/debate/${debate.address}`} passHref>
           <Button variant="outline">View Debate</Button>
         </Link>
       </div>

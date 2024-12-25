@@ -53,8 +53,8 @@ export interface BetInfo {
 }
 
 export class DebateFactoryContract {
-  private contract: ethers.Contract;
-  private signer: ethers.Signer;
+  private contract!: ethers.Contract;
+  private signer!: ethers.Signer;
 
   static async create(provider: BrowserProvider): Promise<DebateFactoryContract> {
     const instance = new DebateFactoryContract();
@@ -91,8 +91,8 @@ export class DebateFactoryContract {
 }
 
 export class DebateContract {
-  private contract: ethers.Contract;
-  private signer: ethers.Signer;
+  private contract!: ethers.Contract;
+  private signer!: ethers.Signer;
 
   static async create(address: string, provider: BrowserProvider): Promise<DebateContract> {
     const instance = new DebateContract();
