@@ -57,35 +57,9 @@ contract DebateFactory is OwnableRoles {
         });
     }
     
-    function addSupportedToken(address tokenAddress) external onlyOwner {
-        require(tokenAddress != address(0), "Invalid token address");
-        require(!supportedTokens[tokenAddress].isValid, "Token already supported");
-        
-        (bool success, bytes memory data) = tokenAddress.staticcall(abi.encodeWithSignature("name()"));
-        require(success, "Token must implement name");
-        string memory name = abi.decode(data, (string));
-
-        (success, data) = tokenAddress.staticcall(abi.encodeWithSignature("symbol()"));
-        require(success, "Token must implement symbol");
-        string memory symbol = abi.decode(data, (string));
-
-        (success, data) = tokenAddress.staticcall(abi.encodeWithSignature("decimals()"));
-        require(success, "Token must implement decimals");
-        uint8 decimals = abi.decode(data, (uint8));
-        
-        supportedTokens[tokenAddress] = TokenInfo({
-            name: name,
-            symbol: symbol,
-            decimals: decimals,
-            isValid: true
-        });
-        
-        emit TokenAdded(tokenAddress, name, symbol, decimals);
-    }
-    
     function updateDefaultConfig(DebateConfig calldata newConfig) external onlyOwner {
-        require(newConfig.minimumDuration >= 1 hours, "Duration too short");
-        require(newConfig.bondingDuration < newConfig.minimumDuration, "Invalid bonding duration");
+        require(newConfig.minimumDuration >= 1 hours, "Minimum duration too short");
+        require(newConfig.bondingDuration > 0, "Bonding duration must be > 0");
         defaultConfig = newConfig;
     }
     
@@ -98,7 +72,6 @@ contract DebateFactory is OwnableRoles {
     ) external returns (address) {
         require(duration >= defaultConfig.minimumDuration, "Duration too short");
         require(config.bondingDuration < duration, "Invalid bonding duration");
-        require(supportedTokens[tokenAddress].isValid, "Token not supported");
         
         TokenInfo memory tokenInfo = supportedTokens[tokenAddress];
         
@@ -178,4 +151,4 @@ contract DebateFactory is OwnableRoles {
     function getAllDebates() external view returns (address[] memory) {
         return allDebates;
     }
-}
+} 

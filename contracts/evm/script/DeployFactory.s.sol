@@ -13,11 +13,6 @@ contract DeployDebateFactory is Script {
 
         // Deploy DebateFactory
         DebateFactory factory = new DebateFactory();
-
-        // Add test token (USDC on Sepolia)
-        address testToken = 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238;
-        factory.addSupportedToken(testToken);
-
         // Configure default settings
         DebateFactory.DebateConfig memory config = DebateFactory.DebateConfig({
             bondingTarget: 1000 * 10**6,     // 1000 USDC (6 decimals)

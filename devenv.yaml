@@ -1,0 +1,23 @@
+inputs:
+  nixpkgs-working-bun:
+    url: github:nixos/nixpkgs/8a44f79f611d0157c840cd9413fcba0703670358
+  fenix:
+    url: github:nix-community/fenix/3247290e1bba55878a2c62d43894d0309d29c918
+    inputs:
+      nixpkgs:
+        follows: nixpkgs
+  nix2container:
+    url: github:nlewo/nix2container
+    inputs:
+      nixpkgs:
+        follows: nixpkgs
+  foundry:
+    url: github:shazow/foundry.nix
+    inputs:
+      nixpkgs:
+        follows: nixpkgs
+  mk-shell-bin:
+    url: github:rrbutani/nix-mk-shell-bin
+  nixpkgs:
+    url: github:cachix/devenv-nixpkgs/rolling
+allowUnfree: true

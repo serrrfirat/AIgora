@@ -223,28 +223,6 @@ in {
       evm-script Deploy
     '';
 
-    evm-verify-e2e.exec = ''
-      function ver() {
-        cd $(git rev-parse --show-toplevel)/contracts/evm && forge verify-contract $(cat deployments.json | jq -r .$1) $2 --chain $3 --verifier sourcify
-      }
-      ver xvault XVault arbitrum-sepolia
-      ver vault Vault arbitrum-sepolia
-
-      ver publisher Publisher arbitrum-sepolia
-      ver channelSubscriber Subscriber arbitrum-sepolia
-
-      ver eigenModule EigenModule holesky
-      ver parameters Parameters holesky
-      ver subscriber Subscriber holesky
-      ver channelPublisher Publisher holesky
-      ver baseVault BaseVault holesky
-      ver baseProtocol BaseProtocol holesky
-      ver nuffAccountImpl NuffleAccount holesky
-      ver nuffPortfolio NufflePortfolio holesky
-      ver channelAdapter ChannelAdapter holesky
-      ver router Router holesky
-    '';
-
     evm-script = {
       exec = ''
         evm-script-chain $1 holesky
