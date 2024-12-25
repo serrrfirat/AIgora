@@ -9,6 +9,7 @@ import { Label } from './ui/label';
 import { Card } from './ui/card';
 import { DebateFactoryContract, DebateConfig } from '../lib/contracts';
 
+
 export function CreateDebate() {
   const { address } = useAccount();
   const [topic, setTopic] = useState('');
@@ -26,7 +27,8 @@ export function CreateDebate() {
 
     try {
       setIsLoading(true);
-      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      if (!window.ethereum) throw new Error("Please install MetaMask");
+      const provider = new ethers.providers.Web3Provider(window.ethereum as ethers.providers.ExternalProvider);
       const factory = new DebateFactoryContract(provider);
 
       const config: DebateConfig = {

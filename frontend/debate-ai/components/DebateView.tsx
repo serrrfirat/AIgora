@@ -36,7 +36,8 @@ export function DebateView({ debateAddress }: DebateViewProps) {
       if (!address) return;
 
       try {
-        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        if (!window.ethereum) throw new Error("Please install MetaMask");
+        const provider = new ethers.providers.Web3Provider(window.ethereum as ethers.providers.ExternalProvider);
         const debateContract = new DebateContract(debateAddress, provider);
         setDebate(debateContract);
 
@@ -125,14 +126,14 @@ export function DebateView({ debateAddress }: DebateViewProps) {
         </TabsList>
 
         <TabsContent value="bet">
-          {userBet?.amount.gt(0) ? (
+          {(userBet?.amount ?? ethers.constants.Zero).gt(ethers.constants.Zero) ? (
             <div className="space-y-2">
               <h3 className="font-semibold">Your Bet</h3>
-              <p>Amount: {ethers.utils.formatEther(userBet.amount)} tokens</p>
-              <p>Prediction: {userBet.prediction ? 'For' : 'Against'}</p>
-              <p>Early Better: {userBet.isEarlyBetter ? 'Yes' : 'No'}</p>
-              <p>Evidence: {userBet.evidence}</p>
-              <p>Twitter: {userBet.twitterHandle}</p>
+              <p>Amount: {ethers.utils.formatEther(userBet?.amount ?? ethers.constants.Zero)} ETH</p>
+              <p>Prediction: {userBet?.prediction ? 'True' : 'False'}</p>
+              <p>Evidence: {userBet?.evidence}</p>
+              <p>Twitter: {userBet?.twitterHandle}</p>
+              <p>Early Better: {userBet?.isEarlyBetter ? 'Yes' : 'No'}</p>
             </div>
           ) : (
             <form onSubmit={handlePlaceBet} className="space-y-4">
@@ -239,7 +240,10 @@ export function DebateView({ debateAddress }: DebateViewProps) {
               <h3 className="font-semibold">Bonding Curve</h3>
               <p>Target: {ethers.utils.formatEther(debateInfo.bondingCurve.target)} tokens</p>
               <p>Current: {ethers.utils.formatEther(debateInfo.bondingCurve.current)} tokens</p>
-              <p>Current Price: {ethers.utils.formatEther(debateInfo.bondingCurve.currentPrice)} tokens</p>
+              <div className="flex justify-between items-center">
+                <p>Current Price: {ethers.utils.formatEther(debateInfo.bondingCurve.currentPrice)} ETH</p>
+                <p>Bonding Progress: {ethers.utils.formatEther(debateInfo.bondingCurve.current)}/{ethers.utils.formatEther(debateInfo.bondingCurve.target)}</p>
+              </div>
               <p>Status: {debateInfo.bondingCurve.isFulfilled ? 'Fulfilled' : 'In Progress'}</p>
             </div>
 

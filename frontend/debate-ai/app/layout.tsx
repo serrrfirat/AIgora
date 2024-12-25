@@ -1,6 +1,7 @@
 import './globals.css'
 import { Inter } from 'next/font/google'
 import { WalletConnection } from '@/components/wallet-connection'
+import { Providers } from './providers'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -26,7 +27,9 @@ export default function RootLayout({
             </div>
           </nav>
         </header>
-        <main>{children}</main>
+        <Providers>
+          <main>{children}</main>
+        </Providers>
         <footer className="border-t border-zinc-800 py-4 mt-8">
           <div className="container mx-auto px-4 flex justify-between items-center">
             <p className="text-zinc-400">© 2024 DEBATE AI</p>

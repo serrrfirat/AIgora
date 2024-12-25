@@ -1,13 +1,13 @@
-import { ethers, BrowserProvider } from 'ethers';
+import { ethers } from 'ethers';
 import DebateFactoryABI from './abis/DebateFactory.json';
 import DebateABI from './abis/Debate.json';
 
 export const FACTORY_ADDRESS = process.env.NEXT_PUBLIC_FACTORY_ADDRESS as string;
 
 export interface DebateConfig {
-  bondingTarget: bigint;
+  bondingTarget: ethers.BigNumber;
   bondingDuration: number;
-  basePrice: bigint;
+  basePrice: ethers.BigNumber;
   minimumDuration: number;
 }
 
@@ -27,10 +27,10 @@ export interface DebateInfo {
   isActive: boolean;
   debateEndTime: number;
   bondingCurve: {
-    target: bigint;
-    current: bigint;
-    basePrice: bigint;
-    currentPrice: bigint;
+    target: ethers.BigNumber;
+    current: ethers.BigNumber;
+    basePrice: ethers.BigNumber;
+    currentPrice: ethers.BigNumber;
     isFulfilled: boolean;
     endTime: number;
   };
@@ -45,7 +45,7 @@ export interface RoundInfo {
 }
 
 export interface BetInfo {
-  amount: bigint;
+  amount: ethers.BigNumber;
   prediction: boolean;
   isEarlyBetter: boolean;
   evidence: string;
@@ -53,17 +53,13 @@ export interface BetInfo {
 }
 
 export class DebateFactoryContract {
-  private contract!: ethers.Contract;
-  private signer!: ethers.Signer;
+  private contract: ethers.Contract;
+  private signer: ethers.Signer;
 
-  static async create(provider: BrowserProvider): Promise<DebateFactoryContract> {
-    const instance = new DebateFactoryContract();
-    instance.signer = await provider.getSigner();
-    instance.contract = new ethers.Contract(FACTORY_ADDRESS, DebateFactoryABI, instance.signer);
-    return instance;
+  constructor(provider: ethers.providers.Web3Provider) {
+    this.signer = provider.getSigner();
+    this.contract = new ethers.Contract(FACTORY_ADDRESS, DebateFactoryABI, this.signer);
   }
-
-  private constructor() {}
 
   async getDefaultConfig(): Promise<DebateConfig> {
     return await this.contract.defaultConfig();
@@ -77,7 +73,7 @@ export class DebateFactoryContract {
   ): Promise<string> {
     const tx = await this.contract.createDebate(topic, duration, tokenAddress, config);
     const receipt = await tx.wait();
-    const event = receipt.events?.find((e: any) => e.event === 'DebateCreated');
+    const event = receipt.events?.find((e: { event: string }) => e.event === 'DebateCreated');
     return event?.args?.debateAddress;
   }
 
@@ -86,22 +82,18 @@ export class DebateFactoryContract {
   }
 
   async getAllDebates(): Promise<string[]> {
-    return await this.contract.allDebates();
+    return await this.contract.getAllDebates();
   }
 }
 
 export class DebateContract {
-  private contract!: ethers.Contract;
-  private signer!: ethers.Signer;
+  private contract: ethers.Contract;
+  private signer: ethers.Signer;
 
-  static async create(address: string, provider: BrowserProvider): Promise<DebateContract> {
-    const instance = new DebateContract();
-    instance.signer = await provider.getSigner();
-    instance.contract = new ethers.Contract(address, DebateABI, instance.signer);
-    return instance;
+  constructor(address: string, provider: ethers.providers.Web3Provider) {
+    this.signer = provider.getSigner();
+    this.contract = new ethers.Contract(address, DebateABI, this.signer);
   }
-
-  private constructor() {}
 
   async getDebateInfo(): Promise<DebateInfo> {
     const [
@@ -137,7 +129,7 @@ export class DebateContract {
   }
 
   async placeBet(
-    amount: bigint,
+    amount: ethers.BigNumber,
     prediction: boolean,
     evidence: string,
     twitterHandle: string
@@ -159,7 +151,7 @@ export class DebateContract {
     return await this.contract.getBetInfo(address);
   }
 
-  async getCurrentPrice(): Promise<bigint> {
+  async getCurrentPrice(): Promise<ethers.BigNumber> {
     return await this.contract.getCurrentPrice();
   }
 } 

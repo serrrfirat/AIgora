@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useAccount } from 'wagmi';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
-import { DebateFactoryContract, DebateContract, DebateInfo } from '../lib/contracts';
+import { DebateFactoryContract, DebateContract, type DebateInfo } from '../lib/contracts';
 
 interface DebatePreview extends DebateInfo {
   address: string;
@@ -22,23 +22,23 @@ export function DebateList() {
       if (!address) return;
 
       try {
-        const provider = new ethers.BrowserProvider();
+        if (!window.ethereum) throw new Error("Please install MetaMask");
+        const provider = new ethers.providers.Web3Provider(window.ethereum as ethers.providers.ExternalProvider);
         const factory = new DebateFactoryContract(provider);
         const debateAddresses = await factory.getAllDebates();
 
-        const debateInfos = await Promise.all(
-          debateAddresses.map(async (debateAddress) => {
-            const debate = new DebateContract(debateAddress, provider);
+        const debates = await Promise.all(
+          debateAddresses.map(async (address) => {
+            const debate = new DebateContract(address, provider);
             const info = await debate.getDebateInfo();
             return {
               ...info,
-              address: debateAddress,
-            };
+              address,
+            } as DebatePreview;
           })
         );
 
-        // Filter out inactive debates and sort by most recent
-        const activeDebates = debateInfos
+        const activeDebates = debates
           .filter((debate) => debate.isActive)
           .sort((a, b) => b.debateEndTime - a.debateEndTime);
 
@@ -113,8 +113,8 @@ function DebateCard({ debate }: DebateCardProps) {
         <div className="text-sm">
           <p>Round: {debate.currentRound} / {debate.totalRounds}</p>
           <p>
-            Bonding: {ethers.formatEther(debate.bondingCurve.current)}/
-            {ethers.formatEther(debate.bondingCurve.target)} tokens
+            Bonding: {ethers.utils.formatEther(debate.bondingCurve.current)}/
+            {ethers.utils.formatEther(debate.bondingCurve.target)} tokens
           </p>
         </div>
         <Link href={`/debate/${debate.address}`} passHref>
