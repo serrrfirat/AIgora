@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.25;
 
-import "solady/auth/Ownable.sol";
-import "solady/utils/LibString.sol";
+import { OwnableRoles } from "solady/auth/OwnableRoles.sol";
+import { LibString } from "solady/utils/LibString.sol";
 import "./Debate.sol";
 
 /**
  * @title DebateFactory
  * @notice Factory contract for creating new Debate instances with ERC20 token support
  */
-contract DebateFactory is Ownable {
+contract DebateFactory is OwnableRoles {
     struct DebateConfig {
         uint256 bondingTarget;     // Target amount for bonding curve completion (in token decimals)
         uint256 bondingDuration;   // Duration of bonding period in seconds
@@ -93,7 +93,8 @@ contract DebateFactory is Ownable {
         string memory topic,
         uint256 duration,
         address tokenAddress,
-        DebateConfig memory config
+        DebateConfig memory config,
+        address[] memory judges
     ) external returns (address) {
         require(duration >= defaultConfig.minimumDuration, "Duration too short");
         require(config.bondingDuration < duration, "Invalid bonding duration");
@@ -125,7 +126,8 @@ contract DebateFactory is Ownable {
             config.bondingTarget,
             config.bondingDuration,
             config.basePrice,
-            5 // Default number of rounds
+            5,
+            judges
         );
         
         verifiedDebates[address(newDebate)] = true;

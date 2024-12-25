@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.25;
 
-import "solady/auth/Ownable.sol";
-import "solady/utils/SafeTransferLib.sol";
-import "solady/utils/LibString.sol";
-import "solady/tokens/ERC20.sol";
-import { ERC20, OwnableRoles, ReentrancyGuard, Initializable } from "solady/Milady.sol";
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
+import { LibString } from "solady/utils/LibString.sol";
+import { OwnableRoles } from "solady/auth/OwnableRoles.sol";
+import { ReentrancyGuard } from "solady/utils/ReentrancyGuard.sol";
+import { ERC20 } from "solady/tokens/ERC20.sol";
 /**
  * @title Debate
  * @notice A contract for managing AI-driven debates with betting and bonding curve mechanics
  * @dev Implements debate rounds, AI scoring, bonding curve, and reward distribution
  */
-contract Debate is ReentrancyGuard, OwnableRoles, Initializable {
+contract Debate is ReentrancyGuard, OwnableRoles {
     // Constants
     uint256 public constant MAX_SCORE = 10;
     uint256 public constant MIN_SCORE = 1;
@@ -20,7 +20,8 @@ contract Debate is ReentrancyGuard, OwnableRoles, Initializable {
     uint256 public constant REQUIRED_JUDGES = 3; // Number of judges required to score each round
 
     // Roles
-    bytes32 public constant JUDGE_ROLE = keccak256("JUDGE_ROLE");
+    uint256 public constant _JUDGE_ROLE = _ROLE_0;
+    uint256 public constant _ADMIN_ROLE = _ROLE_1;
 
     struct BondingCurve {
         uint256 target;          // Target amount to reach
@@ -64,6 +65,7 @@ contract Debate is ReentrancyGuard, OwnableRoles, Initializable {
     uint256 public totalForOutcome;
     uint256 public totalAgainstOutcome;
     address[] public participants;
+    address public token;
 
     // Events
     event DebateCreated(string topic, address creator, uint256 bondingTarget);
@@ -85,11 +87,6 @@ contract Debate is ReentrancyGuard, OwnableRoles, Initializable {
         _;
     }
 
-    modifier onlyJudge() {
-        require(hasRole(JUDGE_ROLE, msg.sender), "Caller is not a judge");
-        _;
-    }
-
     constructor(
         string memory _topic,
         address _tokenAddress,
@@ -97,7 +94,8 @@ contract Debate is ReentrancyGuard, OwnableRoles, Initializable {
         uint256 _bondingTarget,
         uint256 _bondingDuration,
         uint256 _basePrice,
-        uint256 _totalRounds
+        uint256 _totalRounds,
+        address[] memory _judges
     ) {
         require(_duration > _bondingDuration, "Invalid durations");
         require(_bondingTarget > 0, "Invalid bonding target");
@@ -105,7 +103,7 @@ contract Debate is ReentrancyGuard, OwnableRoles, Initializable {
         
         topic = _topic;
         creator = msg.sender;
-        token = IERC20(_tokenAddress);
+        token = _tokenAddress;
         debateEndTime = block.timestamp + _duration;
         totalRounds = _totalRounds;
         isActive = true;
@@ -119,7 +117,11 @@ contract Debate is ReentrancyGuard, OwnableRoles, Initializable {
             endTime: block.timestamp + _bondingDuration
         });
 
-        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _initializeOwner(msg.sender);
+        _grantRoles(msg.sender, _ADMIN_ROLE);
+        for (uint256 i = 0; i < _judges.length; i++) {
+            _grantRoles(_judges[i], _JUDGE_ROLE);
+        }
         
         // Start first round
         startNewRound();
@@ -134,7 +136,7 @@ contract Debate is ReentrancyGuard, OwnableRoles, Initializable {
     {
         require(amount > 0, "Invalid bet amount");
         require(bets[msg.sender].amount == 0, "Already bet");
-        require(token.transferFrom(msg.sender, address(this), amount), "Transfer failed");
+        SafeTransferLib.safeTransferFrom(token, msg.sender, address(this), amount);
 
         bool isEarly = !bondingCurve.isFulfilled && block.timestamp <= bondingCurve.endTime;
         uint256 effectiveAmount = amount;
@@ -169,9 +171,9 @@ contract Debate is ReentrancyGuard, OwnableRoles, Initializable {
     }
 
     function scoreRound(uint256 roundNumber, uint256 score) 
-        external 
-        onlyJudge 
+        external  
         onlyActive 
+        onlyRoles(_JUDGE_ROLE)
     {
         require(score >= MIN_SCORE && score <= MAX_SCORE, "Invalid score");
         require(roundNumber == currentRound, "Invalid round");
@@ -263,7 +265,7 @@ contract Debate is ReentrancyGuard, OwnableRoles, Initializable {
                 uint256 share = (effectiveAmount * BASIS_POINTS) / winningPool;
                 uint256 reward = (totalPot * share) / BASIS_POINTS;
 
-                require(token.transfer(participant, reward), "Reward transfer failed");
+                SafeTransferLib.safeTransfer(token, participant, reward);
             }
         }
     }
