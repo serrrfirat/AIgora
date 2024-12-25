@@ -1,9 +1,0 @@
-[submodule "lib/openzeppelin-contracts"]
-	path = lib/openzeppelin-contracts
-	url = https://github.com/OpenZeppelin/openzeppelin-contracts
-[submodule "contracts/lib/solady"]
-	path = contracts/lib/solady
-	url = https://github.com/vectorized/solady
-[submodule "lib/solady"]
-	path = lib/solady
-	url = https://github.com/vectorized/solady
