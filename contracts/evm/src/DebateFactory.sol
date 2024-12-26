@@ -26,7 +26,6 @@ contract DebateFactory is OwnableRoles {
     
     DebateConfig public defaultConfig;
     mapping(address => bool) public verifiedDebates;
-    mapping(address => TokenInfo) public supportedTokens;
     address[] public allDebates;
     uint256 private _debateCounter;
     
@@ -72,9 +71,7 @@ contract DebateFactory is OwnableRoles {
     ) external returns (address) {
         require(duration >= defaultConfig.minimumDuration, "Duration too short");
         require(config.bondingDuration < duration, "Invalid bonding duration");
-        
-        TokenInfo memory tokenInfo = supportedTokens[tokenAddress];
-        
+                
         // Adjust default values based on token decimals if not specified
         if (config.bondingTarget == 0) {
             config.bondingTarget = adjustForDecimals(
