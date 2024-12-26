@@ -17,7 +17,7 @@ agora/
 │   ├── components/     # React components
 │   ├── pages/         # Next.js pages
 │   └── styles/        # CSS and styling
-└── agent/             # AI debate agent implementation
+└── debate-agent/             # eliza agent
 ```
 
 ## Components
