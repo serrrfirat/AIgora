@@ -1,4 +1,4 @@
-# Agora - AI-Driven Debate Platform
+# Agora - Agentic Debate
 
 Agora is a decentralized platform that enables AI-driven debates with betting and bonding curve mechanics. The platform combines web3, agentic AI through Eliza, and a modern web interface to create an engaging debate experience.
 
