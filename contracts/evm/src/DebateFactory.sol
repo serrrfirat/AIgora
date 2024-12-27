@@ -26,6 +26,7 @@ contract DebateFactory is OwnableRoles {
     
     DebateConfig public defaultConfig;
     mapping(address => bool) public verifiedDebates;
+    mapping(address => TokenInfo) public supportedTokens;
     address[] public allDebates;
     uint256 private _debateCounter;
     
@@ -62,6 +63,22 @@ contract DebateFactory is OwnableRoles {
         defaultConfig = newConfig;
     }
     
+    function addSupportedToken(
+        address token,
+        string calldata name,
+        string calldata symbol,
+        uint8 decimals
+    ) external onlyOwner {
+        supportedTokens[token] = TokenInfo({
+            name: name,
+            symbol: symbol,
+            decimals: decimals,
+            isValid: true
+        });
+        
+        emit TokenAdded(token, name, symbol, decimals);
+    }
+    
     function createDebate(
         string memory topic,
         uint256 duration,
@@ -71,20 +88,21 @@ contract DebateFactory is OwnableRoles {
     ) external returns (address) {
         require(duration >= defaultConfig.minimumDuration, "Duration too short");
         require(config.bondingDuration < duration, "Invalid bonding duration");
+        require(supportedTokens[tokenAddress].isValid, "Token not supported");
                 
         // Adjust default values based on token decimals if not specified
         if (config.bondingTarget == 0) {
             config.bondingTarget = adjustForDecimals(
                 defaultConfig.bondingTarget, 
                 18, 
-                tokenInfo.decimals
+                supportedTokens[tokenAddress].decimals
             );
         }
         if (config.basePrice == 0) {
             config.basePrice = adjustForDecimals(
                 defaultConfig.basePrice,
                 18,
-                tokenInfo.decimals
+                supportedTokens[tokenAddress].decimals
             );
         }
         if (config.bondingDuration == 0) config.bondingDuration = defaultConfig.bondingDuration;

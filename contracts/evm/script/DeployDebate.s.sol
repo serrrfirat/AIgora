@@ -31,6 +31,16 @@ contract DeployDebate is Script {
 
         // Add a test token (replace with actual token address)
         address testToken = address(0xD248d2f09bFbe04e67fC7Fea08828D6AD6d95B6D); // Replace with actual token
+        
+        // Add test token to supported tokens
+        factory.addSupportedToken(
+            testToken,
+            "Test Token",
+            "TEST",
+            18  // assuming 18 decimals, adjust if different
+        );
+        console2.log("Test token added to supported tokens");
+
         // Create a sample debate
         address[] memory judges = new address[](3);
         judges[0] = deployer;
