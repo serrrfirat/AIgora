@@ -4,242 +4,201 @@ pragma solidity ^0.8.25;
 import { Test } from "forge-std/Test.sol";
 import { console2 } from "forge-std/console2.sol";
 import { Debate } from "../src/Debate.sol";
-import { MockERC20 } from "./mocks/MockERC20.sol";
 
 contract DebateTest is Test {
     Debate public debate;
-    MockERC20 public token;
-    
-    address public deployer;
-    address public judge1;
-    address public judge2;
-    address public judge3;
-    address public better1;
-    address public better2;
-    address public better3;
-
-    uint256 public constant INITIAL_BALANCE = 1000 * 10**18;
-    uint256 public constant BONDING_TARGET = 100 * 10**18;
-    uint256 public constant BASE_PRICE = 1 * 10**18;
-    uint256 public constant DURATION = 7 days;
-    uint256 public constant BONDING_DURATION = 1 days;
-    uint256 public constant TOTAL_ROUNDS = 5;
+    address[] public judges;
+    uint256 public constant TOTAL_ROUNDS = 3;
+    uint256 public constant OUTCOME_COUNT = 5;
+    uint256 public constant MAX_SCORE = 10;
 
     function setUp() public {
-        deployer = address(this);
-        judge1 = makeAddr("judge1");
-        judge2 = makeAddr("judge2");
-        judge3 = makeAddr("judge3");
-        better1 = makeAddr("better1");
-        better2 = makeAddr("better2");
-        better3 = makeAddr("better3");
-
-        // Deploy mock token
-        token = new MockERC20("Test Token", "TEST", 18);
-
-        // Mint tokens to betters
-        token.mint(better1, INITIAL_BALANCE);
-        token.mint(better2, INITIAL_BALANCE);
-        token.mint(better3, INITIAL_BALANCE);
-
         // Setup judges
-        address[] memory judges = new address[](3);
-        judges[0] = judge1;
-        judges[1] = judge2;
-        judges[2] = judge3;
+        judges = new address[](3);
+        judges[0] = makeAddr("judge1");
+        judges[1] = makeAddr("judge2");
+        judges[2] = makeAddr("judge3");
 
         // Deploy debate contract
         debate = new Debate(
-            "Test Debate Topic",
-            address(token),
-            DURATION,
-            BONDING_TARGET,
-            BONDING_DURATION,
-            BASE_PRICE,
+            "Test Topic",
+            7 days,
             TOTAL_ROUNDS,
             judges
         );
-
-        // Approve debate contract to spend tokens
-        vm.prank(better1);
-        token.approve(address(debate), type(uint256).max);
-        vm.prank(better2);
-        token.approve(address(debate), type(uint256).max);
-        vm.prank(better3);
-        token.approve(address(debate), type(uint256).max);
     }
 
     function test_Initialization() public {
-        assertEq(debate.topic(), "Test Debate Topic");
-        assertEq(debate.creator(), address(this));
-        assertEq(debate.token(), address(token));
-        assertEq(debate.totalRounds(), TOTAL_ROUNDS);
+        assertEq(debate.topic(), "Test Topic");
         assertEq(debate.currentRound(), 1);
+        assertEq(debate.totalRounds(), TOTAL_ROUNDS);
         assertTrue(debate.isActive());
+        assertFalse(debate.hasOutcome());
     }
 
-    function test_PlaceBet() public {
-        uint256 betAmount = 10 * 10**18;
-        
-        vm.prank(better1);
-        debate.placeBet(betAmount, true, "Evidence 1", "@better1");
+    function test_RoundScoring() public {
+        // First judge scores
+        uint256[] memory scores1 = new uint256[](OUTCOME_COUNT);
+        scores1[0] = 7;
+        scores1[1] = 1;
+        scores1[2] = 1;
+        scores1[3] = 1;
+        scores1[4] = 0;
 
-        (uint256 amount, bool prediction, bool isEarly, 
-        string memory evidence, string memory twitter) = debate.getBetInfo(better1);
-        
-        assertEq(amount, betAmount);
-        assertTrue(prediction);
-        assertTrue(isEarly);
-        assertEq(evidence, "Evidence 1");
-        assertEq(twitter, "@better1");
-        assertEq(token.balanceOf(address(debate)), betAmount);
-    }
+        vm.prank(judges[0]);
+        debate.scoreRound(1, scores1);
 
-    function test_PlaceBetAfterBonding() public {
-        // Skip bonding period
-        vm.warp(block.timestamp + BONDING_DURATION + 1);
-        
-        uint256 betAmount = 10 * 10**18;
-        vm.prank(better1);
-        debate.placeBet(betAmount, true, "Evidence 1", "@better1");
+        // Second judge scores
+        uint256[] memory scores2 = new uint256[](OUTCOME_COUNT);
+        scores2[0] = 8;
+        scores2[1] = 1;
+        scores2[2] = 1;
+        scores2[3] = 0;
+        scores2[4] = 0;
 
-        (uint256 amount, bool prediction, bool isEarly,,) = debate.getBetInfo(better1);
-        
-        assertEq(amount, betAmount);
-        assertTrue(prediction);
-        assertFalse(isEarly);
-    }
+        vm.prank(judges[1]);
+        debate.scoreRound(1, scores2);
 
-    function test_ScoreRound() public {
-        // Place some bets first
-        vm.prank(better1);
-        debate.placeBet(10 * 10**18, true, "Evidence 1", "@better1");
+        // Third judge scores
+        uint256[] memory scores3 = new uint256[](OUTCOME_COUNT);
+        scores3[0] = 9;
+        scores3[1] = 1;
+        scores3[2] = 0;
+        scores3[3] = 0;
+        scores3[4] = 0;
 
-        // Score from all judges
-        vm.prank(judge1);
-        debate.scoreRound(1, 7);
-        vm.prank(judge2);
-        debate.scoreRound(1, 8);
-        vm.prank(judge3);
-        debate.scoreRound(1, 9);
+        vm.prank(judges[2]);
+        debate.scoreRound(1, scores3);
 
-        (bool isComplete, uint256 judgeCount, uint256 totalScore,,) = debate.getRoundInfo(1);
-        
+        // Check round info
+        (bool isComplete, uint256 judgeCount, uint256[] memory totalScores,,) = debate.getRoundInfo(1);
         assertTrue(isComplete);
         assertEq(judgeCount, 3);
-        assertEq(totalScore, 24);
-        assertEq(debate.currentRound(), 2); // Should have moved to next round
+        assertEq(totalScores[0], 24); // 7 + 8 + 9
+        assertEq(totalScores[1], 3);  // 1 + 1 + 1
+        assertEq(totalScores[2], 2);  // 1 + 1 + 0
+        assertEq(totalScores[3], 1);  // 1 + 0 + 0
+        assertEq(totalScores[4], 0);  // 0 + 0 + 0
     }
 
-    function test_CompleteDebateAndDistributeRewards() public {
-        // Place bets
-        uint256 betAmount = 10 * 10**18;
-        vm.prank(better1);
-        debate.placeBet(betAmount, true, "Evidence 1", "@better1");
-        vm.prank(better2);
-        debate.placeBet(betAmount, false, "Evidence 2", "@better2");
-        vm.prank(better3);
-        debate.placeBet(betAmount, true, "Evidence 3", "@better3");
+    function test_CompleteDebate() public {
+        // Score all rounds with consistent scores
+        for (uint256 round = 1; round <= TOTAL_ROUNDS - 1; round++) {
+            // First judge
+            uint256[] memory scores1 = new uint256[](OUTCOME_COUNT);
+            scores1[0] = 8;
+            scores1[1] = 2;
+            scores1[2] = 0;
+            scores1[3] = 0;
+            scores1[4] = 0;
+            vm.prank(judges[0]);
+            debate.scoreRound(round, scores1);
 
-        // Score all rounds with high scores (favoring TRUE outcome)
-        for (uint256 round = 1; round <= 4; round++) {
-            vm.prank(judge1);
-            debate.scoreRound(round, 8);
-            vm.prank(judge2);
-            debate.scoreRound(round, 9);
-            vm.prank(judge3);
-            debate.scoreRound(round, 10);
+            // Second judge
+            uint256[] memory scores2 = new uint256[](OUTCOME_COUNT);
+            scores2[0] = 9;
+            scores2[1] = 1;
+            scores2[2] = 0;
+            scores2[3] = 0;
+            scores2[4] = 0;
+            vm.prank(judges[1]);
+            debate.scoreRound(round, scores2);
+
+            // Third judge
+            uint256[] memory scores3 = new uint256[](OUTCOME_COUNT);
+            scores3[0] = 10;
+            scores3[1] = 0;
+            scores3[2] = 0;
+            scores3[3] = 0;
+            scores3[4] = 0;
+            vm.prank(judges[2]);
+            debate.scoreRound(round, scores3);
         }
 
-        // Check debate is completed
-        assertFalse(debate.isActive());
-
-        // Verify final balances
-        uint256 better1Balance = token.balanceOf(better1);
-        uint256 better2Balance = token.balanceOf(better2);
-        uint256 better3Balance = token.balanceOf(better3);
-
-        // Winners (better1 and better3) should get their initial bet back plus winnings
-        assertTrue(better1Balance > INITIAL_BALANCE - betAmount, "Better1 should win");
-        assertTrue(better2Balance < INITIAL_BALANCE, "Better2 should lose");
-        assertTrue(better3Balance > INITIAL_BALANCE - betAmount, "Better3 should win");
-
-        // Try to score after debate is finalized
-        vm.expectRevert("Debate not active");
-        vm.prank(judge1);
-        debate.scoreRound(5, 8);
+        // Check final outcome
+        assertTrue(debate.hasOutcome());
+        assertEq(debate.finalOutcome(), 0); // Outcome 0 should win with highest scores
+        assertFalse(debate.isActive()); // Debate should be inactive after completion
     }
 
-    function test_RevertWhen_BetTwice() public {
-        uint256 betAmount = 10 * 10**18;
-        
-        vm.prank(better1);
-        debate.placeBet(betAmount, true, "Evidence 1", "@better1");
+    function test_RevertWhen_InvalidScores() public {
+        // Test scores not summing to MAX_SCORE
+        uint256[] memory invalidScores = new uint256[](OUTCOME_COUNT);
+        invalidScores[0] = 8;
+        invalidScores[1] = 1;
+        invalidScores[2] = 0;
+        invalidScores[3] = 0;
+        invalidScores[4] = 0;
 
-        vm.expectRevert("Already bet");
-        vm.prank(better1);
-        debate.placeBet(betAmount, true, "Evidence 1", "@better1");
+        vm.prank(judges[0]);
+        vm.expectRevert("Scores must sum to MAX_SCORE");
+        debate.scoreRound(1, invalidScores);
+
+        // Test score too high
+        uint256[] memory highScores = new uint256[](OUTCOME_COUNT);
+        highScores[0] = 11;
+        highScores[1] = 0;
+        highScores[2] = 0;
+        highScores[3] = 0;
+        highScores[4] = 0;
+
+        vm.prank(judges[0]);
+        vm.expectRevert("Score too high");
+        debate.scoreRound(1, highScores);
     }
 
-    function test_RevertWhen_UnauthorizedJudge() public {
-        vm.prank(better1);
+    function test_RevertWhen_InvalidJudge() public {
+        address nonJudge = vm.addr(0x123);
+        vm.label(nonJudge, "nonJudge");
+        vm.prank(nonJudge);
         vm.expectRevert();
-        debate.scoreRound(1, 8);
+        uint256[] memory scores = new uint256[](OUTCOME_COUNT);
+        scores[0] = 8;
+        scores[1] = 2;
+        debate.scoreRound(1, scores);
     }
 
-    function test_RevertWhen_InvalidScore() public {
-        vm.prank(judge1);
-        vm.expectRevert("Invalid score");
-        debate.scoreRound(1, 11);
-    }
+    function test_RevertWhen_DuplicateScore() public {
+        uint256[] memory scores = new uint256[](OUTCOME_COUNT);
+        scores[0] = 9;
+        scores[1] = 1;
+        scores[2] = 0;
+        scores[3] = 0;
+        scores[4] = 0;
 
-    function test_RevertWhen_ScoreTwice() public {
-        vm.prank(judge1);
-        debate.scoreRound(1, 8);
-
-        vm.prank(judge1);
+        vm.startPrank(judges[0]);
+        debate.scoreRound(1, scores);
         vm.expectRevert("Already scored");
-        debate.scoreRound(1, 9);
+        debate.scoreRound(1, scores);
+        vm.stopPrank();
     }
 
-    function test_BondingCurveMechanics() public {
-        uint256 initialPrice = debate.getCurrentPrice();
-        
-        // Place bet during bonding period
-        uint256 betAmount = BONDING_TARGET / 2;
-        vm.prank(better1);
-        debate.placeBet(betAmount, true, "Evidence 1", "@better1");
+    function test_ConsensusScoring() public {
+        // All judges give same scores
+        uint256[] memory scores = new uint256[](OUTCOME_COUNT);
+        scores[0] = 5;
+        scores[1] = 3;
+        scores[2] = 2;
+        scores[3] = 0;
+        scores[4] = 0;
 
-        uint256 newPrice = debate.getCurrentPrice();
-        assertTrue(newPrice > initialPrice);
+        vm.prank(judges[0]);
+        debate.scoreRound(1, scores);
 
-        // Place bet that fulfills bonding target
-        vm.prank(better2);
-        debate.placeBet(BONDING_TARGET - betAmount, true, "Evidence 2", "@better2");
+        vm.prank(judges[1]);
+        debate.scoreRound(1, scores);
 
-        // Check bonding curve is fulfilled
-        (,,,,bool isFulfilled,) = debate.bondingCurve();
-        assertTrue(isFulfilled);
-    }
+        vm.prank(judges[2]);
+        debate.scoreRound(1, scores);
 
-    function test_EarlyBetterBonus() public {
-        uint256 betAmount = 10 * 10**18;
-        
-        // Place bet during bonding period
-        vm.prank(better1);
-        debate.placeBet(betAmount, true, "Evidence 1", "@better1");
-
-        (,, bool isEarly,,) = debate.getBetInfo(better1);
-        assertTrue(isEarly);
-
-        // Skip bonding period
-        vm.warp(block.timestamp + BONDING_DURATION + 1);
-        
-        // Place bet after bonding period
-        vm.prank(better2);
-        debate.placeBet(betAmount, true, "Evidence 2", "@better2");
-
-        (,, isEarly,,) = debate.getBetInfo(better2);
-        assertFalse(isEarly);
+        // Check round is complete with expected total scores
+        (bool isComplete, uint256 judgeCount, uint256[] memory totalScores,,) = debate.getRoundInfo(1);
+        assertTrue(isComplete);
+        assertEq(judgeCount, 3);
+        assertEq(totalScores[0], 15); // 5 * 3
+        assertEq(totalScores[1], 9);  // 3 * 3
+        assertEq(totalScores[2], 6);  // 2 * 3
+        assertEq(totalScores[3], 0);
+        assertEq(totalScores[4], 0);
     }
 } 

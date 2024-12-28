@@ -109,12 +109,8 @@ contract DebateFactory is OwnableRoles {
         
         Debate newDebate = new Debate(
             topic,
-            tokenAddress,
             duration,
-            config.bondingTarget,
-            config.bondingDuration,
-            config.basePrice,
-            5,
+            5, // totalRounds
             judges
         );
         
