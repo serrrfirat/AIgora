@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useContractRead, useContractWrite, usePrepareContractWrite } from 'wagmi';
+import { useReadContract, useWriteContract } from 'wagmi';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,51 +29,43 @@ export function DebateView({ address }: DebateViewProps) {
   const [orderPrice, setOrderPrice] = useState('');
   const [score, setScore] = useState(5); // Default score
 
-  const { data: debateInfo } = useContractRead({
+  const { data: debateInfo } = useReadContract({
     address,
     abi: DEBATE_ABI,
     functionName: 'getDebateInfo',
-    watch: true,
   }) as { data: DebateInfo | undefined };
 
-  const { data: roundScores } = useContractRead({
+  const { data: roundScores } = useReadContract({
     address,
     abi: DEBATE_ABI,
     functionName: 'getRoundScores',
     args: [debateInfo?.currentRound ?? 0],
-    enabled: Boolean(debateInfo),
-    watch: true,
   }) as { data: bigint[] | undefined };
 
   const orderAmountWei = Math.floor(Number(orderAmount) * 10**18);
   const orderPriceBasisPoints = Math.floor(Number(orderPrice) * 100);
 
-  const { config: placeLimitOrderConfig } = usePrepareContractWrite({
-    address: debateInfo?.market,
-    abi: DEBATE_MARKET_ABI,
-    functionName: 'placeLimitOrder',
-    args: [
-      selectedOutcome,
-      orderPriceBasisPoints,
-      orderAmountWei,
-    ],
-    enabled: Boolean(debateInfo?.market && orderAmount && orderPrice),
-  });
+  const { writeContract: placeLimitOrder, isPending: isPlacingOrder } = useWriteContract();
 
-  const { write: placeLimitOrder, isLoading: isPlacingOrder } = useContractWrite(placeLimitOrderConfig);
+  const { writeContract: scoreRound, isPending: isScoring } = useWriteContract();
 
-  const { config: scoreRoundConfig } = usePrepareContractWrite({
-    address,
-    abi: DEBATE_ABI,
-    functionName: 'scoreRound',
-    args: [
-      debateInfo?.currentRound ?? 0,
-      score,
-    ],
-    enabled: Boolean(debateInfo),
-  });
+  const handlePlaceOrder = () => {
+    placeLimitOrder({
+      address: debateInfo?.market as `0x${string}`,
+      abi: DEBATE_MARKET_ABI,
+      functionName: 'placeLimitOrder',
+      args: [selectedOutcome, orderPriceBasisPoints, orderAmountWei],
+    });
+  };
 
-  const { write: scoreRound, isLoading: isScoring } = useContractWrite(scoreRoundConfig);
+  const handleScoreRound = () => {
+    scoreRound({
+      address,
+      abi: DEBATE_ABI,
+      functionName: 'scoreRound',
+      args: [debateInfo?.currentRound ?? 0, score],
+    });
+  };
 
   if (!debateInfo) {
     return (
@@ -84,18 +76,6 @@ export function DebateView({ address }: DebateViewProps) {
       </Card>
     );
   }
-
-  const handlePlaceOrder = () => {
-    if (placeLimitOrder) {
-      placeLimitOrder();
-    }
-  };
-
-  const handleScoreRound = () => {
-    if (scoreRound) {
-      scoreRound();
-    }
-  };
 
   return (
     <div className="space-y-4">

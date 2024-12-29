@@ -6,39 +6,51 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { useAccount, useContractWrite, usePrepareContractWrite, useNetwork } from 'wagmi';
 import { DEBATE_FACTORY_ADDRESS, DEBATE_FACTORY_ABI } from '@/config/contracts';
+import { useAccount, useChainId, useWalletClient, useWriteContract } from 'wagmi';
 
 export function CreateDebate() {
   const { address, isConnected } = useAccount();
-  const { chain } = useNetwork();
+  const chainId = useChainId();
+  const { data: walletClient } = useWalletClient();
   const [topic, setTopic] = useState('');
   const [description, setDescription] = useState('');
   const [duration, setDuration] = useState(7); // Default 7 days
   const [judges, setJudges] = useState<string[]>(['']); // Start with one judge input
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const durationInSeconds = duration * 24 * 60 * 60; // Convert days to seconds
 
-  const { config, error: prepareError } = usePrepareContractWrite({
-    address: DEBATE_FACTORY_ADDRESS,
-    abi: DEBATE_FACTORY_ABI,
-    functionName: 'createDebate',
-    args: [
-      topic,
-      durationInSeconds,
-      process.env.NEXT_PUBLIC_USDC_ADDRESS as `0x${string}`,
-      {
-        bondingTarget: 1000 * 10**18, // 1000 USDC
-        bondingDuration: 24 * 60 * 60, // 1 day
-        basePrice: 0.1 * 10**18, // 0.1 USDC
-        minimumDuration: 24 * 60 * 60 // 1 day
-      },
-      judges.filter(j => j !== '') as `0x${string}`[]
-    ],
-    enabled: Boolean(isConnected && topic && duration && judges.length > 0 && address)
-  });
+  const { writeContract, isPending, error: writeError } = useWriteContract();
 
-  const { write: createDebate, isLoading, error: writeError } = useContractWrite(config);
+  const handleCreateDebate = async () => {
+    if (!writeContract || !walletClient) return;
+
+    try {
+      setIsSubmitting(true);
+      await writeContract({
+        address: DEBATE_FACTORY_ADDRESS,
+        abi: DEBATE_FACTORY_ABI,
+        functionName: 'createDebate',
+        args: [
+          topic,
+          durationInSeconds,
+          process.env.NEXT_PUBLIC_USDC_ADDRESS as `0x${string}`,
+          {
+            bondingTarget: 1000n * 10n**18n, // 1000 USDC
+            bondingDuration: 24n * 60n * 60n, // 1 day
+            basePrice: 1n * 10n**17n, // 0.1 USDC
+            minimumDuration: 24n * 60n * 60n // 1 day
+          },
+          judges.filter(j => j !== '') as `0x${string}`[]
+        ]
+      });
+    } catch (error) {
+      console.error('Error creating debate:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   // Debug logging
   useEffect(() => {
@@ -46,19 +58,16 @@ export function CreateDebate() {
       factoryAddress: DEBATE_FACTORY_ADDRESS,
       userAddress: address,
       isConnected,
-      chainId: chain?.id,
-      chainName: chain?.name,
+      chainId,
       topic,
       duration,
       judges: judges.filter(j => j !== ''),
-      hasConfig: !!config,
-      hasWrite: !!createDebate,
-      isLoading,
-      prepareError,
+      hasWrite: !!writeContract,
+      isPending,
       writeError,
       enabled: Boolean(isConnected && topic && duration && judges.length > 0 && address)
     });
-  }, [address, isConnected, chain, topic, duration, judges, config, createDebate, isLoading, prepareError, writeError]);
+  }, [address, isConnected, chainId, topic, duration, judges, writeContract, isPending, writeError]);
 
   const addJudge = () => {
     setJudges([...judges, '']);
@@ -72,8 +81,8 @@ export function CreateDebate() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (createDebate) {
-      createDebate();
+    if (handleCreateDebate) {
+      handleCreateDebate();
     }
   };
 
@@ -88,11 +97,9 @@ export function CreateDebate() {
         <div className="text-sm text-gray-500 mt-2">
           <p>Wallet connected: {isConnected ? 'Yes' : 'No'}</p>
           <p>Wallet address: {address || 'Not connected'}</p>
-          <p>Network: {chain?.name || 'Unknown'}</p>
-          <p>Has config: {config ? 'Yes' : 'No'}</p>
-          <p>Can write: {createDebate ? 'Yes' : 'No'}</p>
-          <p>Is loading: {isLoading ? 'Yes' : 'No'}</p>
-          {prepareError && <p className="text-red-500">Prepare error: {prepareError.message}</p>}
+          <p>Network: {chainId}</p>
+          <p>Can write: {!writeError ? 'Yes' : 'No'}</p>
+          <p>Is pending: {isPending ? 'Yes' : 'No'}</p>
           {writeError && <p className="text-red-500">Write error: {writeError.message}</p>}
         </div>
       </CardHeader>
@@ -161,10 +168,10 @@ export function CreateDebate() {
           ) : (
             <Button
               type="submit"
-              disabled={isLoading || !createDebate}
+              disabled={isPending || isSubmitting}
               className="w-full"
             >
-              {isLoading ? 'Creating...' : 'Create Debate'}
+              {isPending || isSubmitting ? 'Creating...' : 'Create Debate'}
             </Button>
           )}
         </form>

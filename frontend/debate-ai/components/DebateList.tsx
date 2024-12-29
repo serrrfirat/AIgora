@@ -1,11 +1,10 @@
 'use client';
 
-import { useContractRead } from 'wagmi';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DEBATE_FACTORY_ADDRESS, DEBATE_FACTORY_ABI, DEBATE_ABI } from '@/config/contracts';
 import { useRouter } from 'next/navigation';
-
+import { useReadContract } from 'wagmi';
 interface DebateInfo {
   topic: string;
   startTime: bigint;
@@ -19,18 +18,18 @@ interface DebateInfo {
 export function DebateList() {
   const router = useRouter();
 
-  const { data: debates = [], isLoading } = useContractRead({
-    address: DEBATE_FACTORY_ADDRESS,
-    abi: DEBATE_FACTORY_ABI,
-    functionName: 'getAllDebates',
-    watch: true,
-  }) as { data: `0x${string}`[] | undefined; isLoading: boolean };
 
-  const { data: debateCount } = useContractRead({
+  function ReadContract() {
+    const { data: debates, isLoading } = useReadContract({
+      address: DEBATE_FACTORY_ADDRESS,
+      abi: DEBATE_FACTORY_ABI,
+      functionName: 'getAllDebates',
+    }) as { data: `0x${string}`[], isLoading: boolean }
+
+  const { data: debateCount } = useReadContract({
     address: DEBATE_FACTORY_ADDRESS,
     abi: DEBATE_FACTORY_ABI,
     functionName: 'getDebateCount',
-    watch: true,
   });
 
   if (isLoading) {
@@ -72,10 +71,11 @@ export function DebateList() {
       </Card>
     </div>
   );
+  }
 }
 
 function DebateCard({ address, onClick }: { address: `0x${string}`; onClick: () => void }) {
-  const { data: debateInfo } = useContractRead({
+  const { data: debateInfo } = useReadContract({
     address,
     abi: DEBATE_ABI,
     functionName: 'getDebateInfo',
@@ -101,4 +101,4 @@ function DebateCard({ address, onClick }: { address: `0x${string}`; onClick: () 
       </CardContent>
     </Card>
   );
-} 
+}
