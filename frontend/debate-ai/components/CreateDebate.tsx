@@ -1,156 +1,174 @@
 'use client';
 
-import { useState } from 'react';
-import { ethers } from 'ethers';
-import { useAccount } from 'wagmi';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
-import { Card } from './ui/card';
-import { DebateFactoryContract, DebateConfig } from '../lib/contracts';
-
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { useAccount, useContractWrite, usePrepareContractWrite, useNetwork } from 'wagmi';
+import { DEBATE_FACTORY_ADDRESS, DEBATE_FACTORY_ABI } from '@/config/contracts';
 
 export function CreateDebate() {
-  const { address } = useAccount();
+  const { address, isConnected } = useAccount();
+  const { chain } = useNetwork();
   const [topic, setTopic] = useState('');
-  const [tokenAddress, setTokenAddress] = useState('');
-  const [duration, setDuration] = useState('86400'); // 1 day in seconds
-  const [bondingTarget, setBondingTarget] = useState('1000');
-  const [bondingDuration, setBondingDuration] = useState('3600'); // 1 hour in seconds
-  const [basePrice, setBasePrice] = useState('0.1');
-  const [totalRounds, setTotalRounds] = useState('5');
-  const [isLoading, setIsLoading] = useState(false);
+  const [description, setDescription] = useState('');
+  const [duration, setDuration] = useState(7); // Default 7 days
+  const [judges, setJudges] = useState<string[]>(['']); // Start with one judge input
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const durationInSeconds = duration * 24 * 60 * 60; // Convert days to seconds
+
+  const { config, error: prepareError } = usePrepareContractWrite({
+    address: DEBATE_FACTORY_ADDRESS,
+    abi: DEBATE_FACTORY_ABI,
+    functionName: 'createDebate',
+    args: [
+      topic,
+      durationInSeconds,
+      process.env.NEXT_PUBLIC_USDC_ADDRESS as `0x${string}`,
+      {
+        bondingTarget: 1000 * 10**18, // 1000 USDC
+        bondingDuration: 24 * 60 * 60, // 1 day
+        basePrice: 0.1 * 10**18, // 0.1 USDC
+        minimumDuration: 24 * 60 * 60 // 1 day
+      },
+      judges.filter(j => j !== '') as `0x${string}`[]
+    ],
+    enabled: Boolean(isConnected && topic && duration && judges.length > 0 && address)
+  });
+
+  const { write: createDebate, isLoading, error: writeError } = useContractWrite(config);
+
+  // Debug logging
+  useEffect(() => {
+    console.log('Debug Info:', {
+      factoryAddress: DEBATE_FACTORY_ADDRESS,
+      userAddress: address,
+      isConnected,
+      chainId: chain?.id,
+      chainName: chain?.name,
+      topic,
+      duration,
+      judges: judges.filter(j => j !== ''),
+      hasConfig: !!config,
+      hasWrite: !!createDebate,
+      isLoading,
+      prepareError,
+      writeError,
+      enabled: Boolean(isConnected && topic && duration && judges.length > 0 && address)
+    });
+  }, [address, isConnected, chain, topic, duration, judges, config, createDebate, isLoading, prepareError, writeError]);
+
+  const addJudge = () => {
+    setJudges([...judges, '']);
+  };
+
+  const updateJudge = (index: number, value: string) => {
+    const newJudges = [...judges];
+    newJudges[index] = value;
+    setJudges(newJudges);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!address) return;
-
-    try {
-      setIsLoading(true);
-      if (!window.ethereum) throw new Error("Please install MetaMask");
-      const provider = new ethers.providers.Web3Provider(window.ethereum as ethers.providers.ExternalProvider);
-      const factory = new DebateFactoryContract(provider);
-
-      const config: DebateConfig = {
-        bondingTarget: ethers.utils.parseEther(bondingTarget),
-        bondingDuration: parseInt(bondingDuration),
-        basePrice: ethers.utils.parseEther(basePrice),
-        minimumDuration: parseInt(duration)
-      };
-
-      const debateAddress = await factory.createDebate(
-        topic,
-        parseInt(duration),
-        tokenAddress,
-        config
-      );
-
-      console.log('Debate created at:', debateAddress);
-      // You can add a success notification here
-    } catch (error) {
-      console.error('Error creating debate:', error);
-      // You can add an error notification here
-    } finally {
-      setIsLoading(false);
+    if (createDebate) {
+      createDebate();
     }
   };
 
   return (
-    <Card className="p-6">
-      <h2 className="text-2xl font-bold mb-4">Create New Debate</h2>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <Label htmlFor="topic">Topic</Label>
-          <Input
-            id="topic"
-            value={topic}
-            onChange={(e) => setTopic(e.target.value)}
-            placeholder="Enter debate topic"
-            required
-          />
+    <Card>
+      <CardHeader>
+        <CardTitle>Create a New Debate</CardTitle>
+        <CardDescription>
+          Set up a new debate topic and define its parameters
+        </CardDescription>
+        {/* Debug info display */}
+        <div className="text-sm text-gray-500 mt-2">
+          <p>Wallet connected: {isConnected ? 'Yes' : 'No'}</p>
+          <p>Wallet address: {address || 'Not connected'}</p>
+          <p>Network: {chain?.name || 'Unknown'}</p>
+          <p>Has config: {config ? 'Yes' : 'No'}</p>
+          <p>Can write: {createDebate ? 'Yes' : 'No'}</p>
+          <p>Is loading: {isLoading ? 'Yes' : 'No'}</p>
+          {prepareError && <p className="text-red-500">Prepare error: {prepareError.message}</p>}
+          {writeError && <p className="text-red-500">Write error: {writeError.message}</p>}
         </div>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="topic">Topic</Label>
+            <Input
+              id="topic"
+              placeholder="Enter debate topic"
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              required
+            />
+          </div>
 
-        <div>
-          <Label htmlFor="tokenAddress">Token Address</Label>
-          <Input
-            id="tokenAddress"
-            value={tokenAddress}
-            onChange={(e) => setTokenAddress(e.target.value)}
-            placeholder="Enter ERC20 token address"
-            required
-          />
-        </div>
+          <div className="space-y-2">
+            <Label htmlFor="description">Description</Label>
+            <Textarea
+              id="description"
+              placeholder="Describe the debate topic"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              required
+            />
+          </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="duration">Duration (seconds)</Label>
+          <div className="space-y-2">
+            <Label htmlFor="duration">Duration (days)</Label>
             <Input
               id="duration"
               type="number"
-              value={duration}
-              onChange={(e) => setDuration(e.target.value)}
-              min="3600"
-              required
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="totalRounds">Total Rounds</Label>
-            <Input
-              id="totalRounds"
-              type="number"
-              value={totalRounds}
-              onChange={(e) => setTotalRounds(e.target.value)}
               min="1"
-              required
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="bondingTarget">Bonding Target</Label>
-            <Input
-              id="bondingTarget"
-              type="number"
-              value={bondingTarget}
-              onChange={(e) => setBondingTarget(e.target.value)}
-              min="0"
-              step="0.1"
+              value={duration}
+              onChange={(e) => setDuration(Number(e.target.value))}
               required
             />
           </div>
 
-          <div>
-            <Label htmlFor="bondingDuration">Bonding Duration (seconds)</Label>
-            <Input
-              id="bondingDuration"
-              type="number"
-              value={bondingDuration}
-              onChange={(e) => setBondingDuration(e.target.value)}
-              min="300"
-              required
-            />
+          <div className="space-y-2">
+            <Label>Judges</Label>
+            {judges.map((judge, index) => (
+              <Input
+                key={index}
+                placeholder={`Judge ${index + 1} address`}
+                value={judge}
+                onChange={(e) => updateJudge(index, e.target.value)}
+                className="mb-2"
+                required
+              />
+            ))}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={addJudge}
+              className="mt-2"
+            >
+              Add Judge
+            </Button>
           </div>
-        </div>
 
-        <div>
-          <Label htmlFor="basePrice">Base Price</Label>
-          <Input
-            id="basePrice"
-            type="number"
-            value={basePrice}
-            onChange={(e) => setBasePrice(e.target.value)}
-            min="0"
-            step="0.01"
-            required
-          />
-        </div>
-
-        <Button type="submit" disabled={isLoading || !address} className="w-full">
-          {isLoading ? 'Creating...' : 'Create Debate'}
-        </Button>
-      </form>
+          {!isConnected ? (
+            <div className="text-center p-4 bg-yellow-50 text-yellow-800 rounded-md">
+              Please connect your wallet to create a debate
+            </div>
+          ) : (
+            <Button
+              type="submit"
+              disabled={isLoading || !createDebate}
+              className="w-full"
+            >
+              {isLoading ? 'Creating...' : 'Create Debate'}
+            </Button>
+          )}
+        </form>
+      </CardContent>
     </Card>
   );
 } 

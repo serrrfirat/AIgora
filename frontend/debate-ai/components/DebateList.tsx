@@ -1,126 +1,104 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { ethers } from 'ethers';
-import Link from 'next/link';
-import { useAccount } from 'wagmi';
-import { Button } from './ui/button';
-import { Card } from './ui/card';
-import { DebateFactoryContract, DebateContract, type DebateInfo } from '../lib/contracts';
+import { useContractRead } from 'wagmi';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { DEBATE_FACTORY_ADDRESS, DEBATE_FACTORY_ABI, DEBATE_ABI } from '@/config/contracts';
+import { useRouter } from 'next/navigation';
 
-interface DebatePreview extends DebateInfo {
-  address: string;
+interface DebateInfo {
+  topic: string;
+  startTime: bigint;
+  endTime: bigint;
+  currentRound: number;
+  totalRounds: number;
+  isActive: boolean;
+  market: `0x${string}`;
 }
 
 export function DebateList() {
-  const { address } = useAccount();
-  const [debates, setDebates] = useState<DebatePreview[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
 
-  useEffect(() => {
-    const loadDebates = async () => {
-      if (!address) return;
+  const { data: debates = [], isLoading } = useContractRead({
+    address: DEBATE_FACTORY_ADDRESS,
+    abi: DEBATE_FACTORY_ABI,
+    functionName: 'getAllDebates',
+    watch: true,
+  }) as { data: `0x${string}`[] | undefined; isLoading: boolean };
 
-      try {
-        if (!window.ethereum) throw new Error("Please install MetaMask");
-        const provider = new ethers.providers.Web3Provider(window.ethereum as ethers.providers.ExternalProvider);
-        const factory = new DebateFactoryContract(provider);
-        const debateAddresses = await factory.getAllDebates();
+  const { data: debateCount } = useContractRead({
+    address: DEBATE_FACTORY_ADDRESS,
+    abi: DEBATE_FACTORY_ABI,
+    functionName: 'getDebateCount',
+    watch: true,
+  });
 
-        const debates = await Promise.all(
-          debateAddresses.map(async (address) => {
-            const debate = new DebateContract(address, provider);
-            const info = await debate.getDebateInfo();
-            return {
-              ...info,
-              address,
-            } as DebatePreview;
-          })
-        );
-
-        const activeDebates = debates
-          .filter((debate) => debate.isActive)
-          .sort((a, b) => b.debateEndTime - a.debateEndTime);
-
-        setDebates(activeDebates);
-      } catch (error) {
-        console.error('Error loading debates:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadDebates();
-  }, [address]);
-
-  if (isLoading) return <div>Loading debates...</div>;
-  if (!address) return <div>Please connect your wallet to view debates</div>;
-  if (debates.length === 0) return <div>No active debates found</div>;
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="text-center">Loading debates...</div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
-    <div className="grid gap-4">
-      {debates.map((debate) => (
-        <DebateCard key={debate.address} debate={debate} />
-      ))}
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>Active Debates</CardTitle>
+          <CardDescription>
+            Total Debates: {debateCount?.toString() || '0'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {debates.length === 0 ? (
+            <div className="text-center py-4">
+              No active debates found. Create one to get started!
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {debates.map((debateAddress) => (
+                <DebateCard
+                  key={debateAddress}
+                  address={debateAddress}
+                  onClick={() => router.push(`/debates/${debateAddress}`)}
+                />
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
 
-interface DebateCardProps {
-  debate: DebatePreview;
-}
+function DebateCard({ address, onClick }: { address: `0x${string}`; onClick: () => void }) {
+  const { data: debateInfo } = useContractRead({
+    address,
+    abi: DEBATE_ABI,
+    functionName: 'getDebateInfo',
+  }) as { data: DebateInfo | undefined };
 
-function DebateCard({ debate }: DebateCardProps) {
-  const timeLeft = debate.debateEndTime * 1000 - Date.now();
-  const isActive = debate.isActive && timeLeft > 0;
-
-  const formatTimeLeft = (ms: number) => {
-    if (ms <= 0) return 'Ended';
-    const seconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-
-    if (days > 0) return `${days}d ${hours % 24}h`;
-    if (hours > 0) return `${hours}h ${minutes % 60}m`;
-    if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
-    return `${seconds}s`;
-  };
-
-  const formatAddress = (address: string) => 
-    `${address.slice(0, 6)}...${address.slice(-4)}`;
+  if (!debateInfo) return null;
 
   return (
-    <Card className="p-4">
-      <div className="flex justify-between items-start mb-2">
-        <div>
-          <h3 className="text-lg font-semibold">{debate.topic}</h3>
-          <p className="text-sm text-gray-500">
-            Created by: {formatAddress(debate.creator)}
-          </p>
+    <Card className="hover:bg-accent/50 cursor-pointer" onClick={onClick}>
+      <CardContent className="p-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h3 className="font-semibold">{debateInfo.topic}</h3>
+            <p className="text-sm text-muted-foreground">
+              Status: {debateInfo.isActive ? 'Active' : 'Completed'}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Round: {debateInfo.currentRound} of {debateInfo.totalRounds}
+            </p>
+          </div>
+          <Button variant="outline">View Details</Button>
         </div>
-        <div className="text-right">
-          <p className={`text-sm ${isActive ? 'text-green-500' : 'text-red-500'}`}>
-            {isActive ? 'Active' : 'Ended'}
-          </p>
-          <p className="text-sm text-gray-500">
-            {formatTimeLeft(timeLeft)}
-          </p>
-        </div>
-      </div>
-
-      <div className="flex justify-between items-center mt-4">
-        <div className="text-sm">
-          <p>Round: {debate.currentRound} / {debate.totalRounds}</p>
-          <p>
-            Bonding: {ethers.utils.formatEther(debate.bondingCurve.current)}/
-            {ethers.utils.formatEther(debate.bondingCurve.target)} tokens
-          </p>
-        </div>
-        <Link href={`/debate/${debate.address}`} passHref>
-          <Button variant="outline">View Debate</Button>
-        </Link>
-      </div>
+      </CardContent>
     </Card>
   );
 } 

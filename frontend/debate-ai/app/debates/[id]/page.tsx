@@ -1,13 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useParams } from 'next/navigation';
 import { useContractRead, useContractWrite, usePrepareContractWrite } from 'wagmi';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { DEBATE_ABI, DEBATE_MARKET_ABI } from '@/config/contracts';
+import { DEBATE_ABI, DEBATE_FACTORY_ABI } from '@/config/contracts';
+import { useState } from 'react';
 
 interface DebateInfo {
   topic: string;
@@ -19,69 +20,49 @@ interface DebateInfo {
   market: `0x${string}`;
 }
 
-interface DebateViewProps {
-  address: `0x${string}`;
-}
-
-export function DebateView({ address }: DebateViewProps) {
+export default function DebatePage() {
+  const { id } = useParams();
   const [selectedOutcome, setSelectedOutcome] = useState(0);
   const [orderAmount, setOrderAmount] = useState('');
   const [orderPrice, setOrderPrice] = useState('');
-  const [score, setScore] = useState(5); // Default score
 
   const { data: debateInfo } = useContractRead({
-    address,
+    address: id as `0x${string}`,
     abi: DEBATE_ABI,
     functionName: 'getDebateInfo',
     watch: true,
   }) as { data: DebateInfo | undefined };
 
-  const { data: roundScores } = useContractRead({
-    address,
+  const { data: market } = useContractRead({
+    address: id as `0x${string}`,
     abi: DEBATE_ABI,
-    functionName: 'getRoundScores',
-    args: [debateInfo?.currentRound ?? 0],
-    enabled: Boolean(debateInfo),
+    functionName: 'market',
     watch: true,
-  }) as { data: bigint[] | undefined };
-
-  const orderAmountWei = Math.floor(Number(orderAmount) * 10**18);
-  const orderPriceBasisPoints = Math.floor(Number(orderPrice) * 100);
+  });
 
   const { config: placeLimitOrderConfig } = usePrepareContractWrite({
-    address: debateInfo?.market,
-    abi: DEBATE_MARKET_ABI,
+    address: market as `0x${string}`,
+    abi: DEBATE_FACTORY_ABI,
     functionName: 'placeLimitOrder',
     args: [
       selectedOutcome,
-      orderPriceBasisPoints,
-      orderAmountWei,
+      BigInt(Number(orderPrice) * 100), // Convert to basis points
+      BigInt(Number(orderAmount) * 10**18), // Convert to wei
     ],
-    enabled: Boolean(debateInfo?.market && orderAmount && orderPrice),
+    enabled: Boolean(market && orderAmount && orderPrice),
   });
 
   const { write: placeLimitOrder, isLoading: isPlacingOrder } = useContractWrite(placeLimitOrderConfig);
 
-  const { config: scoreRoundConfig } = usePrepareContractWrite({
-    address,
-    abi: DEBATE_ABI,
-    functionName: 'scoreRound',
-    args: [
-      debateInfo?.currentRound ?? 0,
-      score,
-    ],
-    enabled: Boolean(debateInfo),
-  });
-
-  const { write: scoreRound, isLoading: isScoring } = useContractWrite(scoreRoundConfig);
-
   if (!debateInfo) {
     return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="text-center">Loading debate information...</div>
-        </CardContent>
-      </Card>
+      <div className="container mx-auto p-4">
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center">Loading debate information...</div>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
@@ -91,15 +72,9 @@ export function DebateView({ address }: DebateViewProps) {
     }
   };
 
-  const handleScoreRound = () => {
-    if (scoreRound) {
-      scoreRound();
-    }
-  };
-
   return (
-    <div className="space-y-4">
-      <Card>
+    <div className="container mx-auto p-4">
+      <Card className="mb-6">
         <CardHeader>
           <CardTitle>{debateInfo.topic}</CardTitle>
           <CardDescription>
@@ -183,46 +158,6 @@ export function DebateView({ address }: DebateViewProps) {
               </div>
             </TabsContent>
           </Tabs>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Judge Panel</CardTitle>
-          <CardDescription>Score the current round</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div>
-              <Label>Score (1-10)</Label>
-              <Input
-                type="number"
-                min="1"
-                max="10"
-                value={score}
-                onChange={(e) => setScore(Number(e.target.value))}
-              />
-            </div>
-            <Button
-              onClick={handleScoreRound}
-              disabled={isScoring || !scoreRound || !debateInfo.isActive}
-              className="w-full"
-            >
-              {isScoring ? 'Scoring...' : 'Score Round'}
-            </Button>
-          </div>
-          {roundScores && roundScores.length > 0 && (
-            <div className="mt-4">
-              <p className="text-sm text-muted-foreground">Current Round Scores</p>
-              <div className="flex gap-2">
-                {roundScores.map((score, index) => (
-                  <div key={index} className="p-2 bg-secondary rounded">
-                    {Number(score)}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </CardContent>
       </Card>
     </div>
