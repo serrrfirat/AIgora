@@ -1,210 +1,180 @@
 'use client';
 
-import { useState } from 'react';
-import { useReadContract, useWriteContract } from 'wagmi';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { DEBATE_ABI, DEBATE_MARKET_ABI } from '@/config/contracts';
+import { DEBATE_FACTORY_ADDRESS, DEBATE_FACTORY_ABI } from '@/config/contracts';
+import { useAccount, useContractRead, useContractWrite } from 'wagmi';
 
-interface DebateInfo {
-  topic: string;
-  startTime: bigint;
-  endTime: bigint;
-  currentRound: number;
-  totalRounds: number;
-  isActive: boolean;
-  market: `0x${string}`;
-}
+const OUTCOME_COUNT = 5;
+const MAX_SCORE = 10;
 
 interface DebateViewProps {
-  address: `0x${string}`;
+  debateId: number;
 }
 
-export function DebateView({ address }: DebateViewProps) {
-  const [selectedOutcome, setSelectedOutcome] = useState(0);
-  const [orderAmount, setOrderAmount] = useState('');
-  const [orderPrice, setOrderPrice] = useState('');
-  const [score, setScore] = useState(5); // Default score
+export function DebateView({ debateId }: DebateViewProps) {
+  const { address, isConnected } = useAccount();
+  const [scores, setScores] = useState<number[]>(Array(OUTCOME_COUNT).fill(0));
+  const [totalScore, setTotalScore] = useState(0);
 
-  const { data: debateInfo } = useReadContract({
-    address,
-    abi: DEBATE_ABI,
-    functionName: 'getDebateInfo',
-  }) as { data: DebateInfo | undefined };
+  // Get debate details
+  const { data: debateDetails } = useContractRead({
+    address: DEBATE_FACTORY_ADDRESS,
+    abi: DEBATE_FACTORY_ABI,
+    functionName: 'getDebateDetails',
+    args: [BigInt(debateId)],
+  });
 
-  const { data: roundScores } = useReadContract({
-    address,
-    abi: DEBATE_ABI,
-    functionName: 'getRoundScores',
-    args: [debateInfo?.currentRound ?? 0],
-  }) as { data: bigint[] | undefined };
+  // Get current round info
+  const { data: roundInfo } = useContractRead({
+    address: DEBATE_FACTORY_ADDRESS,
+    abi: DEBATE_FACTORY_ABI,
+    functionName: 'getRoundInfo',
+    args: [BigInt(debateId), debateDetails?.[4] ?? 0n], // currentRound
+    enabled: !!debateDetails,
+  });
 
-  const orderAmountWei = Math.floor(Number(orderAmount) * 10**18);
-  const orderPriceBasisPoints = Math.floor(Number(orderPrice) * 100);
+  // Get judge scores for current round
+  const { data: judgeScores } = useContractRead({
+    address: DEBATE_FACTORY_ADDRESS,
+    abi: DEBATE_FACTORY_ABI,
+    functionName: 'getJudgeScores',
+    args: [BigInt(debateId), debateDetails?.[4] ?? 0n, address!],
+    enabled: !!debateDetails && !!address,
+  });
 
-  const { writeContract: placeLimitOrder, isPending: isPlacingOrder } = useWriteContract();
+  // Get current probabilities
+  const { data: probabilities } = useContractRead({
+    address: DEBATE_FACTORY_ADDRESS,
+    abi: DEBATE_FACTORY_ABI,
+    functionName: 'getCurrentProbabilities',
+    args: [BigInt(debateId)],
+    enabled: !!debateDetails,
+  });
 
-  const { writeContract: scoreRound, isPending: isScoring } = useWriteContract();
+  const { write: scoreRound, isLoading: isScoring } = useContractWrite({
+    address: DEBATE_FACTORY_ADDRESS,
+    abi: DEBATE_FACTORY_ABI,
+    functionName: 'scoreRound',
+  });
 
-  const handlePlaceOrder = () => {
-    placeLimitOrder({
-      address: debateInfo?.market as `0x${string}`,
-      abi: DEBATE_MARKET_ABI,
-      functionName: 'placeLimitOrder',
-      args: [selectedOutcome, orderPriceBasisPoints, orderAmountWei],
-    });
+  const handleScoreChange = (index: number, value: number) => {
+    const newScores = [...scores];
+    newScores[index] = value;
+    setScores(newScores);
+    setTotalScore(newScores.reduce((a, b) => a + b, 0));
   };
 
-  const handleScoreRound = () => {
+  const handleSubmitScores = () => {
+    if (totalScore !== MAX_SCORE) return;
+    
     scoreRound({
-      address,
-      abi: DEBATE_ABI,
-      functionName: 'scoreRound',
-      args: [debateInfo?.currentRound ?? 0, score],
+      args: [
+        BigInt(debateId),
+        debateDetails?.[4] ?? 0n, // currentRound
+        scores.map(s => BigInt(s))
+      ],
     });
   };
 
-  if (!debateInfo) {
-    return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="text-center">Loading debate information...</div>
-        </CardContent>
-      </Card>
-    );
-  }
+  if (!debateDetails) return <div>Loading debate details...</div>;
+
+  const [
+    topic,
+    startTime,
+    duration,
+    debateEndTime,
+    currentRound,
+    totalRounds,
+    isActive,
+    creator,
+    market,
+    judges,
+    hasOutcome,
+    finalOutcome
+  ] = debateDetails;
+
+  const isJudge = judges.includes(address!);
+  const canScore = isJudge && isActive && !judgeScores?.some(s => s > 0);
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>{debateInfo.topic}</CardTitle>
-          <CardDescription>
-            Round {debateInfo.currentRound} of {debateInfo.totalRounds}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Start Time</p>
-              <p>{new Date(Number(debateInfo.startTime) * 1000).toLocaleString()}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">End Time</p>
-              <p>{new Date(Number(debateInfo.endTime) * 1000).toLocaleString()}</p>
-            </div>
+    <Card>
+      <CardHeader>
+        <CardTitle>{topic}</CardTitle>
+        <CardDescription>
+          Round {Number(currentRound)} of {Number(totalRounds)}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {/* Debate Status */}
+          <div>
+            <h3 className="font-semibold">Status</h3>
+            <p>Active: {isActive ? 'Yes' : 'No'}</p>
+            <p>Time Remaining: {Math.max(0, Number(debateEndTime) - Date.now() / 1000)} seconds</p>
+            {hasOutcome && <p>Final Outcome: {Number(finalOutcome)}</p>}
           </div>
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Trading</CardTitle>
-          <CardDescription>Place orders for debate outcomes</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="limit" className="w-full">
-            <TabsList>
-              <TabsTrigger value="limit">Limit Order</TabsTrigger>
-              <TabsTrigger value="market">Market Order</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="limit">
-              <div className="space-y-4">
-                <div>
-                  <Label>Select Outcome</Label>
-                  <select
-                    className="w-full p-2 border rounded"
-                    value={selectedOutcome}
-                    onChange={(e) => setSelectedOutcome(Number(e.target.value))}
-                  >
-                    <option value={0}>Outcome A</option>
-                    <option value={1}>Outcome B</option>
-                    <option value={2}>Outcome C</option>
-                  </select>
-                </div>
-
-                <div>
-                  <Label>Amount</Label>
-                  <Input
-                    type="number"
-                    placeholder="Enter amount"
-                    value={orderAmount}
-                    onChange={(e) => setOrderAmount(e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <Label>Price (in %)</Label>
-                  <Input
-                    type="number"
-                    placeholder="Enter price"
-                    value={orderPrice}
-                    onChange={(e) => setOrderPrice(e.target.value)}
-                  />
-                </div>
-
-                <Button
-                  onClick={handlePlaceOrder}
-                  disabled={isPlacingOrder || !placeLimitOrder}
-                  className="w-full"
-                >
-                  {isPlacingOrder ? 'Placing Order...' : 'Place Limit Order'}
-                </Button>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="market">
-              <div className="text-center py-4">
-                Market orders coming soon!
-              </div>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Judge Panel</CardTitle>
-          <CardDescription>Score the current round</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
+          {/* Current Round */}
+          {roundInfo && (
             <div>
-              <Label>Score (1-10)</Label>
-              <Input
-                type="number"
-                min="1"
-                max="10"
-                value={score}
-                onChange={(e) => setScore(Number(e.target.value))}
-              />
-            </div>
-            <Button
-              onClick={handleScoreRound}
-              disabled={isScoring || !scoreRound || !debateInfo.isActive}
-              className="w-full"
-            >
-              {isScoring ? 'Scoring...' : 'Score Round'}
-            </Button>
-          </div>
-          {roundScores && roundScores.length > 0 && (
-            <div className="mt-4">
-              <p className="text-sm text-muted-foreground">Current Round Scores</p>
-              <div className="flex gap-2">
-                {roundScores.map((score, index) => (
-                  <div key={index} className="p-2 bg-secondary rounded">
-                    {Number(score)}
-                  </div>
+              <h3 className="font-semibold">Current Round</h3>
+              <p>Complete: {roundInfo[0] ? 'Yes' : 'No'}</p>
+              <p>Judges Scored: {Number(roundInfo[1])}</p>
+              <div className="mt-2">
+                <h4>Total Scores:</h4>
+                {roundInfo[2].map((score, i) => (
+                  <p key={i}>Outcome {i}: {Number(score)}</p>
                 ))}
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
-    </div>
+
+          {/* Probabilities */}
+          {probabilities && (
+            <div>
+              <h3 className="font-semibold">Current Probabilities</h3>
+              {probabilities.map((prob, i) => (
+                <p key={i}>Outcome {i}: {Number(prob) / 100}%</p>
+              ))}
+            </div>
+          )}
+
+          {/* Scoring Interface */}
+          {canScore && (
+            <div className="space-y-4">
+              <h3 className="font-semibold">Score Round</h3>
+              <p className="text-sm text-gray-500">
+                Assign scores to each outcome (total must equal {MAX_SCORE})
+              </p>
+              {scores.map((score, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <Label>Outcome {i}</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max={MAX_SCORE}
+                    value={score}
+                    onChange={(e) => handleScoreChange(i, Number(e.target.value))}
+                  />
+                </div>
+              ))}
+              <div className="flex justify-between items-center">
+                <p>Total Score: {totalScore}/{MAX_SCORE}</p>
+                <Button
+                  onClick={handleSubmitScores}
+                  disabled={totalScore !== MAX_SCORE || isScoring}
+                >
+                  {isScoring ? 'Submitting...' : 'Submit Scores'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 } 

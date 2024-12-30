@@ -2,164 +2,325 @@
 pragma solidity ^0.8.25;
 
 import { OwnableRoles } from "solady/auth/OwnableRoles.sol";
-import { LibString } from "solady/utils/LibString.sol";
-import "./Debate.sol";
+import { ReentrancyGuard } from "solady/utils/ReentrancyGuard.sol";
 
-/**
- * @title DebateFactory
- * @notice Factory contract for creating new Debate instances with ERC20 token support
- */
-contract DebateFactory is OwnableRoles {
-    struct DebateConfig {
-        uint256 bondingTarget;     // Target amount for bonding curve completion (in token decimals)
-        uint256 bondingDuration;   // Duration of bonding period in seconds
-        uint256 basePrice;         // Starting price for bonding curve (in token decimals)
-        uint256 minimumDuration;   // Minimum debate duration in seconds
+contract DebateFactory is ReentrancyGuard, OwnableRoles {
+    // Constants
+    uint256 public constant MAX_SCORE = 10;
+    uint256 public constant MIN_SCORE = 0;
+    uint256 public constant REQUIRED_JUDGES = 3;
+    uint256 public constant OUTCOME_COUNT = 5;
+
+    // Roles
+    uint256 public constant _JUDGE_ROLE = _ROLE_0;
+    uint256 public constant _ADMIN_ROLE = _ROLE_1;
+
+    struct Round {
+        mapping(address => mapping(uint256 => uint256)) judgeScores;  // Judge => outcome => score
+        mapping(uint256 => uint256) totalScores;                      // Outcome => total score
+        uint256 judgeCount;      // Number of judges who have scored
+        bool isComplete;         // Round completion status
+        uint256 startTime;       // Round start time
+        uint256 endTime;         // Round end time
     }
-    
-    struct TokenInfo {
-        string name;
-        string symbol;
-        uint8 decimals;
-        bool isValid;
+
+    struct Debate {
+        string topic;
+        uint256 startTime;
+        uint256 duration;
+        uint256 debateEndTime;
+        uint256 currentRound;
+        uint256 totalRounds;
+        bool isActive;
+        address creator;
+        address market;
+        address[] judges;
+        mapping(uint256 => Round) rounds;
+        uint256 finalOutcome;
+        bool hasOutcome;
     }
-    
-    DebateConfig public defaultConfig;
-    mapping(address => bool) public verifiedDebates;
-    mapping(address => TokenInfo) public supportedTokens;
-    address[] public allDebates;
-    uint256 private _debateCounter;
-    
+
+    // Mapping from debate ID to Debate struct
+    mapping(uint256 => Debate) public debates;
+    uint256 public debateCount;
+
+    // Events
     event DebateCreated(
-        address indexed debateAddress,
+        uint256 indexed debateId,
         string topic,
-        address indexed creator,
-        address indexed token,
-        uint256 debateId
+        uint256 duration,
+        uint256 totalRounds,
+        address[] judges
     );
-    
-    event TokenAdded(
-        address indexed token,
-        string name,
-        string symbol,
-        uint8 decimals
-    );
-    
+    event RoundStarted(uint256 indexed debateId, uint256 roundNumber, uint256 startTime);
+    event RoundScored(uint256 indexed debateId, uint256 roundNumber, address judge, uint256[] scores);
+    event RoundCompleted(uint256 indexed debateId, uint256 roundNumber, uint256[] totalScores);
+    event DebateFinalized(uint256 indexed debateId, uint256 finalOutcome);
+    event MarketSet(uint256 indexed debateId, address market);
+
     constructor() {
         _initializeOwner(msg.sender);
-        
-        // Set default configuration (using 18 decimals as base)
-        defaultConfig = DebateConfig({
-            bondingTarget: 1000 * 10**18, // 1000 tokens
-            bondingDuration: 1 days,
-            basePrice: 1 * 10**17,    // 0.1 tokens
-            minimumDuration: 1 days
-        });
+        _grantRoles(msg.sender, _ADMIN_ROLE);
     }
-    
-    function updateDefaultConfig(DebateConfig calldata newConfig) external onlyOwner {
-        require(newConfig.minimumDuration >= 1 hours, "Minimum duration too short");
-        require(newConfig.bondingDuration > 0, "Bonding duration must be > 0");
-        defaultConfig = newConfig;
+
+    modifier onlyDebateActive(uint256 debateId) {
+        Debate storage debate = debates[debateId];
+        require(debate.isActive && block.timestamp < debate.debateEndTime, "Debate not active");
+        _;
     }
-    
-    function addSupportedToken(
-        address token,
-        string calldata name,
-        string calldata symbol,
-        uint8 decimals
-    ) external onlyOwner {
-        supportedTokens[token] = TokenInfo({
-            name: name,
-            symbol: symbol,
-            decimals: decimals,
-            isValid: true
-        });
-        
-        emit TokenAdded(token, name, symbol, decimals);
-    }
-    
+
     function createDebate(
         string memory topic,
         uint256 duration,
-        address tokenAddress,
-        DebateConfig memory config,
+        uint256 totalRounds,
         address[] memory judges
-    ) external returns (address) {
-        require(duration >= defaultConfig.minimumDuration, "Duration too short");
-        require(config.bondingDuration < duration, "Invalid bonding duration");
-        require(supportedTokens[tokenAddress].isValid, "Token not supported");
-                
-        // Adjust default values based on token decimals if not specified
-        if (config.bondingTarget == 0) {
-            config.bondingTarget = adjustForDecimals(
-                defaultConfig.bondingTarget, 
-                18, 
-                supportedTokens[tokenAddress].decimals
-            );
-        }
-        if (config.basePrice == 0) {
-            config.basePrice = adjustForDecimals(
-                defaultConfig.basePrice,
-                18,
-                supportedTokens[tokenAddress].decimals
-            );
-        }
-        if (config.bondingDuration == 0) config.bondingDuration = defaultConfig.bondingDuration;
+    ) external returns (uint256 debateId) {
+        require(duration > 0, "Invalid duration");
+        require(totalRounds > 0, "Invalid round count");
+        require(judges.length > 0, "Must have judges");
+
+        debateId = debateCount++;
+        Debate storage newDebate = debates[debateId];
         
-        Debate newDebate = new Debate(
+        newDebate.topic = topic;
+        newDebate.startTime = block.timestamp;
+        newDebate.duration = duration;
+        newDebate.debateEndTime = block.timestamp + duration;
+        newDebate.totalRounds = totalRounds;
+        newDebate.isActive = true;
+        newDebate.creator = msg.sender;
+        newDebate.judges = judges;
+
+        // Grant judge roles
+        for (uint256 i = 0; i < judges.length; i++) {
+            _grantRoles(judges[i], _JUDGE_ROLE);
+        }
+
+        // Start first round
+        startNewRound(debateId);
+
+        emit DebateCreated(
+            debateId,
             topic,
             duration,
-            5, // totalRounds
+            totalRounds,
             judges
         );
+    }
+
+    function scoreRound(uint256 debateId, uint256 roundNumber, uint256[] calldata scores) 
+        external
+        onlyDebateActive(debateId)
+        onlyRoles(_JUDGE_ROLE)
+    {
+        Debate storage debate = debates[debateId];
+        require(scores.length == OUTCOME_COUNT, "Invalid scores length");
+        require(roundNumber == debate.currentRound, "Invalid round");
+        require(!debate.rounds[roundNumber].isComplete, "Round already complete");
+        require(debate.rounds[roundNumber].judgeCount < REQUIRED_JUDGES, "Round fully scored");
+        require(!hasJudgeScored(debateId, roundNumber, msg.sender), "Already scored");
+
+        // Verify scores sum to MAX_SCORE
+        uint256 totalScore = 0;
+        for (uint256 i = 0; i < scores.length; i++) {
+            require(scores[i] <= MAX_SCORE, "Score too high");
+            totalScore += scores[i];
+        }
+        require(totalScore == MAX_SCORE, "Scores must sum to MAX_SCORE");
+
+        Round storage round = debate.rounds[roundNumber];
         
-        verifiedDebates[address(newDebate)] = true;
-        allDebates.push(address(newDebate));
+        // Record scores for each outcome
+        for (uint256 i = 0; i < scores.length; i++) {
+            round.judgeScores[msg.sender][i] = scores[i];
+            round.totalScores[i] += scores[i];
+        }
+        round.judgeCount++;
+
+        emit RoundScored(debateId, roundNumber, msg.sender, scores);
+
+        if (round.judgeCount == REQUIRED_JUDGES) {
+            round.isComplete = true;
+            
+            // Get total scores for event
+            uint256[] memory totalScores = new uint256[](OUTCOME_COUNT);
+            for (uint256 i = 0; i < OUTCOME_COUNT; i++) {
+                totalScores[i] = round.totalScores[i];
+            }
+            emit RoundCompleted(debateId, roundNumber, totalScores);
+            
+            if (debate.currentRound < debate.totalRounds - 1) {
+                startNewRound(debateId);
+            } else {
+                finalizeDebate(debateId);
+            }
+        }
+    }
+
+    function hasJudgeScored(uint256 debateId, uint256 roundNumber, address judge) public view returns (bool) {
+        Round storage round = debates[debateId].rounds[roundNumber];
+        uint256 totalScore = 0;
+        for (uint256 i = 0; i < OUTCOME_COUNT; i++) {
+            totalScore += round.judgeScores[judge][i];
+        }
+        return totalScore > 0;
+    }
+
+    function startNewRound(uint256 debateId) internal {
+        Debate storage debate = debates[debateId];
+        debate.currentRound++;
+        Round storage newRound = debate.rounds[debate.currentRound];
+        newRound.startTime = block.timestamp;
+        newRound.endTime = block.timestamp + ((debate.debateEndTime - block.timestamp) / (debate.totalRounds - debate.currentRound + 1));
         
-        unchecked {
-            _debateCounter++;
+        emit RoundStarted(debateId, debate.currentRound, block.timestamp);
+    }
+
+    function finalizeDebate(uint256 debateId) internal {
+        Debate storage debate = debates[debateId];
+        require(debate.isActive, "Already finalized");
+        debate.isActive = false;
+
+        // Calculate final outcome
+        debate.finalOutcome = determineOutcome(debateId);
+        debate.hasOutcome = true;
+        emit DebateFinalized(debateId, debate.finalOutcome);
+    }
+
+    function determineOutcome(uint256 debateId) internal view returns (uint256) {
+        Debate storage debate = debates[debateId];
+        uint256[] memory totalScores = new uint256[](OUTCOME_COUNT);
+        uint256 completedRounds = 0;
+
+        // Sum up scores across all rounds
+        for (uint256 round = 1; round <= debate.currentRound; round++) {
+            if (debate.rounds[round].isComplete) {
+                completedRounds++;
+                for (uint256 i = 0; i < OUTCOME_COUNT; i++) {
+                    totalScores[i] += debate.rounds[round].totalScores[i];
+                }
+            }
+        }
+
+        require(completedRounds > 0, "No completed rounds");
+        
+        // Find outcome with highest score
+        uint256 maxScore = 0;
+        uint256 winningOutcome = 0;
+        for (uint256 i = 0; i < OUTCOME_COUNT; i++) {
+            if (totalScores[i] > maxScore) {
+                maxScore = totalScores[i];
+                winningOutcome = i;
+            }
         }
         
-        emit DebateCreated(
-            address(newDebate), 
-            topic, 
-            msg.sender, 
-            tokenAddress,
-            _debateCounter
+        return winningOutcome;
+    }
+
+    function setMarket(uint256 debateId, address _market) external onlyOwner {
+        Debate storage debate = debates[debateId];
+        require(debate.market == address(0), "Market already set");
+        require(_market != address(0), "Invalid market");
+        debate.market = _market;
+        emit MarketSet(debateId, _market);
+    }
+
+    // View functions
+    function getDebateDetails(uint256 debateId) external view returns (
+        string memory topic,
+        uint256 startTime,
+        uint256 duration,
+        uint256 debateEndTime,
+        uint256 currentRound,
+        uint256 totalRounds,
+        bool isActive,
+        address creator,
+        address market,
+        address[] memory judges,
+        bool hasOutcome,
+        uint256 finalOutcome
+    ) {
+        Debate storage debate = debates[debateId];
+        return (
+            debate.topic,
+            debate.startTime,
+            debate.duration,
+            debate.debateEndTime,
+            debate.currentRound,
+            debate.totalRounds,
+            debate.isActive,
+            debate.creator,
+            debate.market,
+            debate.judges,
+            debate.hasOutcome,
+            debate.finalOutcome
         );
-        
-        return address(newDebate);
     }
 
-    function adjustForDecimals(
-        uint256 amount,
-        uint8 fromDecimals,
-        uint8 toDecimals
-    ) internal pure returns (uint256) {
-        if (fromDecimals == toDecimals) return amount;
-        
-        if (fromDecimals > toDecimals) {
-            return amount / (10 ** (fromDecimals - toDecimals));
-        } else {
-            return amount * (10 ** (toDecimals - fromDecimals));
+    function getRoundInfo(uint256 debateId, uint256 roundNumber) 
+        external 
+        view 
+        returns (
+            bool isComplete,
+            uint256 judgeCount,
+            uint256[] memory totalScores,
+            uint256 startTime,
+            uint256 endTime
+        ) 
+    {
+        Round storage round = debates[debateId].rounds[roundNumber];
+        totalScores = new uint256[](OUTCOME_COUNT);
+        for (uint256 i = 0; i < OUTCOME_COUNT; i++) {
+            totalScores[i] = round.totalScores[i];
         }
+        return (
+            round.isComplete,
+            round.judgeCount,
+            totalScores,
+            round.startTime,
+            round.endTime
+        );
     }
 
-    function getDebateCount() external view returns (uint256) {
-        return _debateCounter;
+    function getJudgeScores(uint256 debateId, uint256 roundNumber, address judge) 
+        external 
+        view 
+        returns (uint256[] memory scores) 
+    {
+        scores = new uint256[](OUTCOME_COUNT);
+        Round storage round = debates[debateId].rounds[roundNumber];
+        for (uint256 i = 0; i < OUTCOME_COUNT; i++) {
+            scores[i] = round.judgeScores[judge][i];
+        }
+        return scores;
     }
 
-    function isVerifiedDebate(address debateAddress) external view returns (bool) {
-        return verifiedDebates[debateAddress];
-    }
+    function getCurrentProbabilities(uint256 debateId) external view returns (uint256[] memory) {
+        Debate storage debate = debates[debateId];
+        uint256[] memory totalScores = new uint256[](OUTCOME_COUNT);
+        uint256 completedRounds = 0;
+        uint256 grandTotal = 0;
 
-    function getTokenInfo(address token) external view returns (TokenInfo memory) {
-        require(supportedTokens[token].isValid, "Token not supported");
-        return supportedTokens[token];
-    }
+        // Sum up scores across all rounds
+        for (uint256 round = 1; round <= debate.currentRound; round++) {
+            if (debate.rounds[round].isComplete) {
+                completedRounds++;
+                for (uint256 i = 0; i < OUTCOME_COUNT; i++) {
+                    totalScores[i] += debate.rounds[round].totalScores[i];
+                    grandTotal += debate.rounds[round].totalScores[i];
+                }
+            }
+        }
 
-    function getAllDebates() external view returns (address[] memory) {
-        return allDebates;
+        require(completedRounds > 0, "No completed rounds");
+        require(grandTotal > 0, "No scores recorded");
+
+        // Convert to probabilities in basis points
+        uint256[] memory probabilities = new uint256[](OUTCOME_COUNT);
+        for (uint256 i = 0; i < OUTCOME_COUNT; i++) {
+            probabilities[i] = (totalScores[i] * 10000) / grandTotal;
+        }
+
+        return probabilities;
     }
 } 

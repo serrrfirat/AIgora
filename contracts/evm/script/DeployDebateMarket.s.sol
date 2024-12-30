@@ -2,15 +2,15 @@
 pragma solidity ^0.8.25;
 
 import { Script } from "forge-std/Script.sol";
-import { DebateMarketFactory } from "../src/DebateMarketFactory.sol";
-import { DebateMarket } from "../src/DebateMarket.sol";
+import { DebateFactory } from "../src/DebateFactory.sol";
+import { MockToken } from "./MockToken.sol";
 import { console2 } from "forge-std/console2.sol";
 import { Utils } from "./Utils.sol";
 
 contract DeployDebateMarket is Script, Utils {
-    DebateMarketFactory public factory;
-    address public testToken;
-    address public testDebate;
+    DebateFactory public factory;
+    MockToken public mockToken;
+    uint256 public sampleDebateId;
 
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
@@ -20,44 +20,25 @@ contract DeployDebateMarket is Script, Utils {
         
         vm.startBroadcast(deployerPrivateKey);
 
+        // Deploy Mock Token first
+        mockToken = new MockToken();
+        console2.log("MockToken deployed at:", address(mockToken));
+
         // Deploy Factory
-        factory = new DebateMarketFactory();
-        console2.log("DebateMarketFactory deployed at:", address(factory));
+        factory = new DebateFactory();
+        console2.log("DebateFactory deployed at:", address(factory));
 
-        // Configure default settings
-        DebateMarketFactory.MarketConfig memory config = DebateMarketFactory.MarketConfig({
-            bondingTarget: 1000 * 10**18,  // 1000 tokens
-            bondingDuration: 1 days,
-            basePrice: 1 * 10**17         // 0.1 tokens
-        });
+        // Create a sample debate
+        address[] memory judges = new address[](1);
+        judges[0] = deployer; // Using deployer as the judge for testing
         
-        factory.updateDefaultConfig(config);
-        console2.log("Default config updated");
-
-        // Add a test token (replace with actual token)
-        testToken = address(0xD248d2f09bFbe04e67fC7Fea08828D6AD6d95B6D); // Replace with actual token
-        factory.addSupportedToken(testToken);
-        console2.log("Test token added to supported tokens");
-
-        // Create a sample market
-        string[] memory outcomeNames = new string[](3);
-        outcomeNames[0] = "Outcome A";
-        outcomeNames[1] = "Outcome B";
-        outcomeNames[2] = "Outcome C";
-
-        // Create market for a debate (replace with actual debate address)
-        testDebate = address(0x1234567890123456789012345678901234567890); // Replace with actual debate
-        
-        try factory.createMarket(
-            testDebate,
-            testToken,
-            outcomeNames,
-            config
-        ) returns (address marketAddress) {
-            console2.log("Sample market created at:", marketAddress);
-        } catch Error(string memory reason) {
-            console2.log("Failed to create market:", reason);
-        }
+        sampleDebateId = factory.createDebate(
+            "Sample Debate Topic",
+            7 days, // 7 days duration
+            5, // Max participants
+            judges
+        );
+        console2.log("Sample debate created with ID:", sampleDebateId);
 
         vm.stopBroadcast();
 
@@ -66,14 +47,13 @@ contract DeployDebateMarket is Script, Utils {
     }
 
     function writeBaseJson() internal {
-            string memory jsonObj = "{"
-            '"network":"","factory":"","testToken":"","testDebate":""' "}";        
-            vm.writeJson(jsonObj, "./deployments.json");
+        string memory jsonObj = "{"
+            '"factory":"","mockToken":"","sampleDebateId":""' "}";        
+        vm.writeJson(jsonObj, "./deployments.json");
     }
 
     function logDeploymentSummary() internal {
         writeTo(address(factory), ".factory");
-        writeTo(testToken, ".testToken");
-        writeTo(testDebate, ".testDebate");
+        writeTo(address(mockToken), ".mockToken");
     }
 } 

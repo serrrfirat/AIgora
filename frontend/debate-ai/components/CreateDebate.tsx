@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { DEBATE_FACTORY_ADDRESS, DEBATE_FACTORY_ABI } from '@/config/contracts';
+import { DEBATE_FACTORY_ADDRESS, DEBATE_FACTORY_ABI, REQUIRED_JUDGES } from '@/config/contracts';
 import { useAccount, useChainId, useWalletClient, useWriteContract } from 'wagmi';
 
 export function CreateDebate() {
@@ -16,34 +16,29 @@ export function CreateDebate() {
   const [topic, setTopic] = useState('');
   const [description, setDescription] = useState('');
   const [duration, setDuration] = useState(7); // Default 7 days
+  const [totalRounds, setTotalRounds] = useState(5); // Default 5 rounds
   const [judges, setJudges] = useState<string[]>(['']); // Start with one judge input
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const durationInSeconds = duration * 24 * 60 * 60; // Convert days to seconds
 
-  const { writeContract, isPending, error: writeError } = useWriteContract();
+  const { writeContract: createDebate, isPending: isPending, error: writeError } = useWriteContract();
 
   const handleCreateDebate = async () => {
-    if (!writeContract || !walletClient) return;
+    if (!createDebate || !walletClient) return;
 
     try {
       setIsSubmitting(true);
-      await writeContract({
-        address: DEBATE_FACTORY_ADDRESS,
-        abi: DEBATE_FACTORY_ABI,
-        functionName: 'createDebate',
+      createDebate({
         args: [
           topic,
-          durationInSeconds,
-          process.env.NEXT_PUBLIC_USDC_ADDRESS as `0x${string}`,
-          {
-            bondingTarget: 1000n * 10n**18n, // 1000 USDC
-            bondingDuration: 24n * 60n * 60n, // 1 day
-            basePrice: 1n * 10n**17n, // 0.1 USDC
-            minimumDuration: 24n * 60n * 60n // 1 day
-          },
+          BigInt(durationInSeconds),
+          BigInt(totalRounds),
           judges.filter(j => j !== '') as `0x${string}`[]
-        ]
+        ],
+        abi: DEBATE_FACTORY_ABI,
+        functionName: 'createDebate',
+        address: DEBATE_FACTORY_ADDRESS,
       });
     } catch (error) {
       console.error('Error creating debate:', error);
@@ -61,13 +56,14 @@ export function CreateDebate() {
       chainId,
       topic,
       duration,
+      totalRounds,
       judges: judges.filter(j => j !== ''),
-      hasWrite: !!writeContract,
+      hasWrite: !!createDebate,
       isPending,
       writeError,
-      enabled: Boolean(isConnected && topic && duration && judges.length > 0 && address)
+      enabled: Boolean(isConnected && topic && duration && judges.length >= REQUIRED_JUDGES && address)
     });
-  }, [address, isConnected, chainId, topic, duration, judges, writeContract, isPending, writeError]);
+  }, [address, isConnected, chainId, topic, duration, totalRounds, judges, createDebate, isPending, writeError]);
 
   const addJudge = () => {
     setJudges([...judges, '']);
@@ -140,7 +136,21 @@ export function CreateDebate() {
           </div>
 
           <div className="space-y-2">
-            <Label>Judges</Label>
+            <Label htmlFor="totalRounds">Number of Rounds</Label>
+            <Input
+              id="totalRounds"
+              type="number"
+              min="1"
+              max="10"
+              value={totalRounds}
+              onChange={(e) => setTotalRounds(Number(e.target.value))}
+              required
+            />
+            <p className="text-sm text-gray-500">Each round requires {REQUIRED_JUDGES} judges to score</p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Judges (minimum {REQUIRED_JUDGES})</Label>
             {judges.map((judge, index) => (
               <Input
                 key={index}
@@ -168,7 +178,7 @@ export function CreateDebate() {
           ) : (
             <Button
               type="submit"
-              disabled={isPending || isSubmitting}
+              disabled={isPending || isSubmitting || judges.filter(j => j !== '').length < REQUIRED_JUDGES}
               className="w-full"
             >
               {isPending || isSubmitting ? 'Creating...' : 'Create Debate'}
