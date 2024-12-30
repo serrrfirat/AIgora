@@ -3,7 +3,7 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DEBATE_FACTORY_ADDRESS, DEBATE_FACTORY_ABI, MARKET_FACTORY_ADDRESS, MARKET_FACTORY_ABI } from '@/config/contracts';
-import { useAccount, useReadContract, useReadContracts } from 'wagmi';
+import { useAccount, useReadContract, useReadContracts, useWriteContract } from 'wagmi';
 import { formatEther, formatAddress } from '@/lib/utils';
 
 type DebateDetails = [
@@ -49,7 +49,6 @@ interface DebateViewProps {
 
 export function DebateView({ debateId }: DebateViewProps) {
   const { isConnected } = useAccount();
-
   // Get debate details
   const { data: debateDetails } = useReadContract({
     address: DEBATE_FACTORY_ADDRESS,
@@ -57,6 +56,13 @@ export function DebateView({ debateId }: DebateViewProps) {
     functionName: 'getDebateDetails',
     args: [BigInt(debateId)],
   }) as { data: DebateDetails | undefined };
+
+  // placeLimitOrder
+  const { writeContract: placeLimitOrder } = useWriteContract({
+    address: MARKET_FACTORY_ADDRESS,
+    abi: MARKET_FACTORY_ABI,
+    functionName: 'placeLimitOrder',
+  });
 
   // Get market details
   const { data: marketId } = useReadContract({
