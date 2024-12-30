@@ -43,177 +43,6 @@
       "type": "event"
     },
     {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "uint256",
-          "name": "debateId",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "finalOutcome",
-          "type": "uint256"
-        }
-      ],
-      "name": "DebateFinalized",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "uint256",
-          "name": "debateId",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "address",
-          "name": "market",
-          "type": "address"
-        }
-      ],
-      "name": "MarketSet",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "uint256",
-          "name": "debateId",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "roundNumber",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256[]",
-          "name": "totalScores",
-          "type": "uint256[]"
-        }
-      ],
-      "name": "RoundCompleted",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "uint256",
-          "name": "debateId",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "roundNumber",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "address",
-          "name": "judge",
-          "type": "address"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256[]",
-          "name": "scores",
-          "type": "uint256[]"
-        }
-      ],
-      "name": "RoundScored",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "uint256",
-          "name": "debateId",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "roundNumber",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "startTime",
-          "type": "uint256"
-        }
-      ],
-      "name": "RoundStarted",
-      "type": "event"
-    },
-    {
-      "inputs": [],
-      "name": "MAX_SCORE",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "MIN_SCORE",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "OUTCOME_COUNT",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "REQUIRED_JUDGES",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
       "inputs": [
         {
           "internalType": "string",
@@ -240,24 +69,11 @@
       "outputs": [
         {
           "internalType": "uint256",
-          "name": "debateId",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "debateCount",
-      "outputs": [
-        {
-          "internalType": "uint256",
           "name": "",
           "type": "uint256"
         }
       ],
-      "stateMutability": "view",
+      "stateMutability": "nonpayable",
       "type": "function"
     },
     {
@@ -268,203 +84,67 @@
           "type": "uint256"
         }
       ],
-      "name": "getCurrentProbabilities",
+      "name": "getDebate",
       "outputs": [
         {
-          "internalType": "uint256[]",
+          "components": [
+            {
+              "internalType": "string",
+              "name": "topic",
+              "type": "string"
+            },
+            {
+              "internalType": "uint256",
+              "name": "startTime",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "duration",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "debateEndTime",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "currentRound",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "totalRounds",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bool",
+              "name": "isActive",
+              "type": "bool"
+            },
+            {
+              "internalType": "address",
+              "name": "creator",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "market",
+              "type": "address"
+            },
+            {
+              "internalType": "address[]",
+              "name": "judges",
+              "type": "address[]"
+            }
+          ],
+          "internalType": "struct DebateFactory.Debate",
           "name": "",
-          "type": "uint256[]"
+          "type": "tuple"
         }
       ],
       "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "debateId",
-          "type": "uint256"
-        }
-      ],
-      "name": "getDebateDetails",
-      "outputs": [
-        {
-          "internalType": "string",
-          "name": "topic",
-          "type": "string"
-        },
-        {
-          "internalType": "uint256",
-          "name": "startTime",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "duration",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "debateEndTime",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "currentRound",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "totalRounds",
-          "type": "uint256"
-        },
-        {
-          "internalType": "bool",
-          "name": "isActive",
-          "type": "bool"
-        },
-        {
-          "internalType": "address",
-          "name": "creator",
-          "type": "address"
-        },
-        {
-          "internalType": "address",
-          "name": "market",
-          "type": "address"
-        },
-        {
-          "internalType": "address[]",
-          "name": "judges",
-          "type": "address[]"
-        },
-        {
-          "internalType": "bool",
-          "name": "hasOutcome",
-          "type": "bool"
-        },
-        {
-          "internalType": "uint256",
-          "name": "finalOutcome",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "debateId",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "roundNumber",
-          "type": "uint256"
-        },
-        {
-          "internalType": "address",
-          "name": "judge",
-          "type": "address"
-        }
-      ],
-      "name": "getJudgeScores",
-      "outputs": [
-        {
-          "internalType": "uint256[]",
-          "name": "scores",
-          "type": "uint256[]"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "debateId",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "roundNumber",
-          "type": "uint256"
-        }
-      ],
-      "name": "getRoundInfo",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "isComplete",
-          "type": "bool"
-        },
-        {
-          "internalType": "uint256",
-          "name": "judgeCount",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256[]",
-          "name": "totalScores",
-          "type": "uint256[]"
-        },
-        {
-          "internalType": "uint256",
-          "name": "startTime",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "endTime",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "debateId",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "roundNumber",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256[]",
-          "name": "scores",
-          "type": "uint256[]"
-        }
-      ],
-      "name": "scoreRound",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "debateId",
-          "type": "uint256"
-        },
-        {
-          "internalType": "address",
-          "name": "_market",
-          "type": "address"
-        }
-      ],
-      "name": "setMarket",
-      "outputs": [],
-      "stateMutability": "nonpayable",
       "type": "function"
     }
   ]

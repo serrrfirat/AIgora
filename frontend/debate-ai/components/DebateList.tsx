@@ -1,104 +1,23 @@
 'use client';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { DEBATE_FACTORY_ADDRESS, DEBATE_FACTORY_ABI, DEBATE_ABI } from '@/config/contracts';
-import { useRouter } from 'next/navigation';
 import { useReadContract } from 'wagmi';
-interface DebateInfo {
-  topic: string;
-  startTime: bigint;
-  endTime: bigint;
-  currentRound: number;
-  totalRounds: number;
-  isActive: boolean;
-  market: `0x${string}`;
-}
+import { DEBATE_FACTORY_ADDRESS, DEBATE_FACTORY_ABI } from '@/config/contracts';
+import { Card } from './ui/card';
 
 export function DebateList() {
-  const router = useRouter();
-
-
-  function ReadContract() {
-    const { data: debates, isLoading } = useReadContract({
-      address: DEBATE_FACTORY_ADDRESS,
-      abi: DEBATE_FACTORY_ABI,
-      functionName: 'getAllDebates',
-    }) as { data: `0x${string}`[], isLoading: boolean }
-
-  const { data: debateCount } = useReadContract({
+  const { data: debates  } = useReadContract({
     address: DEBATE_FACTORY_ADDRESS,
     abi: DEBATE_FACTORY_ABI,
-    functionName: 'getDebateCount',
-  });
-
-  if (isLoading) {
-    return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="text-center">Loading debates...</div>
-        </CardContent>
-      </Card>
-    );
-  }
+    functionName: 'getAllDebates',
+  }) as { data: bigint[] | undefined };
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>Active Debates</CardTitle>
-          <CardDescription>
-            Total Debates: {debateCount?.toString() || '0'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {debates.length === 0 ? (
-            <div className="text-center py-4">
-              No active debates found. Create one to get started!
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {debates.map((debateAddress) => (
-                <DebateCard
-                  key={debateAddress}
-                  address={debateAddress}
-                  onClick={() => router.push(`/debates/${debateAddress}`)}
-                />
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+    <div className="space-y-4 p-4">
+      {debates?.map((debateId) => (
+        <Card key={debateId.toString()} className="p-4">
+          <h3 className="text-lg font-semibold">Debate #{debateId.toString()}</h3>
+        </Card>
+      ))}
     </div>
-  );
-  }
-}
-
-function DebateCard({ address, onClick }: { address: `0x${string}`; onClick: () => void }) {
-  const { data: debateInfo } = useReadContract({
-    address,
-    abi: DEBATE_ABI,
-    functionName: 'getDebateInfo',
-  }) as { data: DebateInfo | undefined };
-
-  if (!debateInfo) return null;
-
-  return (
-    <Card className="hover:bg-accent/50 cursor-pointer" onClick={onClick}>
-      <CardContent className="p-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h3 className="font-semibold">{debateInfo.topic}</h3>
-            <p className="text-sm text-muted-foreground">
-              Status: {debateInfo.isActive ? 'Active' : 'Completed'}
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Round: {debateInfo.currentRound} of {debateInfo.totalRounds}
-            </p>
-          </div>
-          <Button variant="outline">View Details</Button>
-        </div>
-      </CardContent>
-    </Card>
   );
 }

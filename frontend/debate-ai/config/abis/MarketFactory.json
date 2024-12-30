@@ -1,0 +1,160 @@
+{
+  "abi": [
+    {
+      "inputs": [],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "marketId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "debateId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "string[]",
+          "name": "outcomeNames",
+          "type": "string[]"
+        }
+      ],
+      "name": "MarketCreated",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_token",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_debateId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "string[]",
+          "name": "_outcomeNames",
+          "type": "string[]"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_bondingTarget",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_bondingDuration",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_basePrice",
+          "type": "uint256"
+        }
+      ],
+      "name": "createMarket",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "marketId",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "marketId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getMarketDetails",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "debateId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "resolved",
+          "type": "bool"
+        },
+        {
+          "internalType": "uint256",
+          "name": "winningOutcome",
+          "type": "uint256"
+        },
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "target",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "current",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "basePrice",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "currentPrice",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bool",
+              "name": "isFulfilled",
+              "type": "bool"
+            },
+            {
+              "internalType": "uint256",
+              "name": "endTime",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct MarketFactory.BondingCurve",
+          "name": "bondingCurve",
+          "type": "tuple"
+        },
+        {
+          "internalType": "uint256",
+          "name": "totalBondingAmount",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ]
+} 
