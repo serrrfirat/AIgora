@@ -3,14 +3,14 @@ pragma solidity ^0.8.25;
 
 import { Script } from "forge-std/Script.sol";
 import { DebateFactory } from "../src/DebateFactory.sol";
-import { MockToken } from "./MockToken.sol";
+import { MarketFactory } from "../src/MarketFactory.sol";
+import { MockToken } from "../src/mocks/MockToken.sol";
 import { console2 } from "forge-std/console2.sol";
 import { Utils } from "./Utils.sol";
-
 contract DeployDebateMarket is Script, Utils {
-    DebateFactory public factory;
-    MockToken public mockToken;
-    uint256 public sampleDebateId;
+    MockToken public token;
+    DebateFactory public debateFactory;
+    MarketFactory public marketFactory;
 
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
@@ -20,40 +20,55 @@ contract DeployDebateMarket is Script, Utils {
         
         vm.startBroadcast(deployerPrivateKey);
 
-        // Deploy Mock Token first
-        mockToken = new MockToken();
-        console2.log("MockToken deployed at:", address(mockToken));
+        // Deploy Token
+        token = new MockToken();
+        console2.log("DebateToken deployed at:", address(token));
 
-        // Deploy Factory
-        factory = new DebateFactory();
-        console2.log("DebateFactory deployed at:", address(factory));
+        // Deploy Factories
+        debateFactory = new DebateFactory();
+        console2.log("DebateFactory deployed at:", address(debateFactory));
 
-        // Create a sample debate
+        marketFactory = new MarketFactory();
+        console2.log("DebateMarketFactory deployed at:", address(marketFactory));
+
+        // Create sample debate
         address[] memory judges = new address[](1);
-        judges[0] = deployer; // Using deployer as the judge for testing
+        judges[0] = deployer;
         
-        sampleDebateId = factory.createDebate(
+        uint256 debateId = debateFactory.createDebate(
             "Sample Debate Topic",
-            7 days, // 7 days duration
-            5, // Max participants
+            7 days,
+            5,
             judges
         );
-        console2.log("Sample debate created with ID:", sampleDebateId);
+        console2.log("Sample debate created with ID:", debateId);
 
+        // Create sample market
+        string[] memory outcomes = new string[](2);
+        outcomes[0] = "Yes";
+        outcomes[1] = "No";
+
+        uint256 marketId = marketFactory.createMarket(
+            address(token),
+            debateId,
+            outcomes,
+            1000 * 10**18,
+            1 days,
+            1 * 10**17
+        );
+        console2.log("Sample market created at:", marketId);
+        
         vm.stopBroadcast();
-
+        // Write deployment info to JSON
         writeBaseJson();
-        logDeploymentSummary();
+        writeTo(address(token), ".token ");
+        writeTo(address(debateFactory), ".debateFactory");
+        writeTo(address(marketFactory), ".marketFactory");
     }
 
-    function writeBaseJson() internal {
+     function writeBaseJson() internal {
         string memory jsonObj = "{"
-            '"factory":"","mockToken":"","sampleDebateId":""' "}";        
+            '"token":"","debateFactory":"","marketFactory":"","debateId":"","marketId":"",' "}";
         vm.writeJson(jsonObj, "./deployments.json");
-    }
-
-    function logDeploymentSummary() internal {
-        writeTo(address(factory), ".factory");
-        writeTo(address(mockToken), ".mockToken");
     }
 } 

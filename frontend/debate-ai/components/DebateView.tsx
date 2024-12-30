@@ -5,11 +5,31 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { DEBATE_FACTORY_ADDRESS, DEBATE_FACTORY_ABI } from '@/config/contracts';
-import { useAccount, useContractRead, useContractWrite } from 'wagmi';
+import { DEBATE_FACTORY_ADDRESS, DEBATE_FACTORY_ABI, OUTCOME_COUNT } from '@/config/contracts';
+import { useAccount, useReadContract, useWriteContract } from 'wagmi';
 
-const OUTCOME_COUNT = 5;
-const MAX_SCORE = 10;
+interface DebateDetails {
+  topic: string;
+  startTime: bigint;
+  duration: bigint;
+  debateEndTime: bigint;
+  currentRound: bigint;
+  totalRounds: bigint;
+  isActive: boolean;
+  creator: `0x${string}`;
+  market: `0x${string}`;
+  judges: `0x${string}`[];
+  hasOutcome: boolean;
+  finalOutcome: bigint;
+}
+
+interface RoundInfo {
+  isComplete: boolean;
+  judgeCount: bigint;
+  totalScores: bigint[];
+  startTime: bigint;
+  endTime: bigint;
+}
 
 interface DebateViewProps {
   debateId: number;
@@ -21,7 +41,7 @@ export function DebateView({ debateId }: DebateViewProps) {
   const [totalScore, setTotalScore] = useState(0);
 
   // Get debate details
-  const { data: debateDetails } = useContractRead({
+  const { data: debateDetails } = useReadContract({
     address: DEBATE_FACTORY_ADDRESS,
     abi: DEBATE_FACTORY_ABI,
     functionName: 'getDebateDetails',
@@ -29,33 +49,30 @@ export function DebateView({ debateId }: DebateViewProps) {
   });
 
   // Get current round info
-  const { data: roundInfo } = useContractRead({
+  const { data: roundInfo } = useReadContract({
     address: DEBATE_FACTORY_ADDRESS,
     abi: DEBATE_FACTORY_ABI,
     functionName: 'getRoundInfo',
     args: [BigInt(debateId), debateDetails?.[4] ?? 0n], // currentRound
-    enabled: !!debateDetails,
   });
 
   // Get judge scores for current round
-  const { data: judgeScores } = useContractRead({
+  const { data: judgeScores } = useReadContract({
     address: DEBATE_FACTORY_ADDRESS,
     abi: DEBATE_FACTORY_ABI,
     functionName: 'getJudgeScores',
     args: [BigInt(debateId), debateDetails?.[4] ?? 0n, address!],
-    enabled: !!debateDetails && !!address,
   });
 
   // Get current probabilities
-  const { data: probabilities } = useContractRead({
+  const { data: probabilities } = useReadContract({
     address: DEBATE_FACTORY_ADDRESS,
     abi: DEBATE_FACTORY_ABI,
     functionName: 'getCurrentProbabilities',
     args: [BigInt(debateId)],
-    enabled: !!debateDetails,
   });
 
-  const { write: scoreRound, isLoading: isScoring } = useContractWrite({
+  const { writeContract: scoreRound, isLoading: isScoring } = useWriteContract({
     address: DEBATE_FACTORY_ADDRESS,
     abi: DEBATE_FACTORY_ABI,
     functionName: 'scoreRound',
@@ -69,12 +86,12 @@ export function DebateView({ debateId }: DebateViewProps) {
   };
 
   const handleSubmitScores = () => {
-    if (totalScore !== MAX_SCORE) return;
+    if (totalScore !== MAX_SCORE || !debateDetails) return;
     
     scoreRound({
       args: [
         BigInt(debateId),
-        debateDetails?.[4] ?? 0n, // currentRound
+        debateDetails.currentRound,
         scores.map(s => BigInt(s))
       ],
     });
@@ -82,30 +99,15 @@ export function DebateView({ debateId }: DebateViewProps) {
 
   if (!debateDetails) return <div>Loading debate details...</div>;
 
-  const [
-    topic,
-    startTime,
-    duration,
-    debateEndTime,
-    currentRound,
-    totalRounds,
-    isActive,
-    creator,
-    market,
-    judges,
-    hasOutcome,
-    finalOutcome
-  ] = debateDetails;
-
-  const isJudge = judges.includes(address!);
-  const canScore = isJudge && isActive && !judgeScores?.some(s => s > 0);
+  const isJudge = debateDetails.judges.includes(address as `0x${string}`);
+  const canScore = isJudge && debateDetails.isActive && !judgeScores?.some(s => s > 0n);
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{topic}</CardTitle>
+        <CardTitle>{debateDetails.topic}</CardTitle>
         <CardDescription>
-          Round {Number(currentRound)} of {Number(totalRounds)}
+          Round {Number(debateDetails.currentRound)} of {Number(debateDetails.totalRounds)}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -113,20 +115,20 @@ export function DebateView({ debateId }: DebateViewProps) {
           {/* Debate Status */}
           <div>
             <h3 className="font-semibold">Status</h3>
-            <p>Active: {isActive ? 'Yes' : 'No'}</p>
-            <p>Time Remaining: {Math.max(0, Number(debateEndTime) - Date.now() / 1000)} seconds</p>
-            {hasOutcome && <p>Final Outcome: {Number(finalOutcome)}</p>}
+            <p>Active: {debateDetails.isActive ? 'Yes' : 'No'}</p>
+            <p>Time Remaining: {Math.max(0, Number(debateDetails.debateEndTime - BigInt(Date.now() / 1000)))} seconds</p>
+            {debateDetails.hasOutcome && <p>Final Outcome: {Number(debateDetails.finalOutcome)}</p>}
           </div>
 
           {/* Current Round */}
           {roundInfo && (
             <div>
               <h3 className="font-semibold">Current Round</h3>
-              <p>Complete: {roundInfo[0] ? 'Yes' : 'No'}</p>
-              <p>Judges Scored: {Number(roundInfo[1])}</p>
+              <p>Complete: {roundInfo.isComplete ? 'Yes' : 'No'}</p>
+              <p>Judges Scored: {Number(roundInfo.judgeCount)}</p>
               <div className="mt-2">
                 <h4>Total Scores:</h4>
-                {roundInfo[2].map((score, i) => (
+                {roundInfo.totalScores.map((score, i) => (
                   <p key={i}>Outcome {i}: {Number(score)}</p>
                 ))}
               </div>

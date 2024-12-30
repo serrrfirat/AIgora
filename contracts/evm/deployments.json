@@ -1,5 +1,1 @@
-{
-  "factory": "0x566da192F28fd759E3Ffa68cCc725E2194e1E644",
-  "mockToken": "0xddd1b12d284133aBe697a42431bAee5D68eDbCcc",
-  "debate": "0xD50ACEdf99fceb3E98f54467075B598439a8A74B"
-}
+"{\"token\":\"\",\"debateFactory\":\"\",\"marketFactory\":\"\",\"debateId\":\"\",\"marketId\":\"\",}"
