@@ -226,6 +226,7 @@ contract DebateFactory is ReentrancyGuard, OwnableRoles {
     }
 
     // View functions
+
     function getDebateDetails(uint256 debateId) external view returns (
         string memory topic,
         uint256 startTime,
@@ -322,5 +323,14 @@ contract DebateFactory is ReentrancyGuard, OwnableRoles {
         }
 
         return probabilities;
+    }
+
+// return debate structs
+    function getAllDebates() external view returns (uint256[] memory) {
+        uint256[] memory debateIds = new uint256[](debateCount);
+        for (uint256 i = 0; i < debateCount; i++) {
+            debateIds[i] = i;
+        }
+        return debateIds;
     }
 } 

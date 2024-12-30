@@ -1,44 +1,54 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import { DEBATE_FACTORY_ADDRESS, DEBATE_FACTORY_ABI, OUTCOME_COUNT } from '@/config/contracts';
-import { useAccount, useReadContract, useWriteContract } from 'wagmi';
+import { DEBATE_FACTORY_ADDRESS, DEBATE_FACTORY_ABI, MARKET_FACTORY_ADDRESS, MARKET_FACTORY_ABI } from '@/config/contracts';
+import { useAccount, useReadContract, useReadContracts } from 'wagmi';
+import { formatEther, formatAddress } from '@/lib/utils';
 
-interface DebateDetails {
-  topic: string;
-  startTime: bigint;
-  duration: bigint;
-  debateEndTime: bigint;
-  currentRound: bigint;
-  totalRounds: bigint;
-  isActive: boolean;
-  creator: `0x${string}`;
-  market: `0x${string}`;
-  judges: `0x${string}`[];
-  hasOutcome: boolean;
-  finalOutcome: bigint;
-}
+type DebateDetails = [
+  string,      // topic
+  bigint,      // startTime
+  bigint,      // duration
+  bigint,      // debateEndTime
+  bigint,      // currentRound
+  bigint,      // totalRounds
+  boolean,     // isActive
+  string,      // creator
+  string,      // market
+  string[],    // judges
+  boolean,     // hasOutcome
+  bigint       // finalOutcome
+];
 
-interface RoundInfo {
-  isComplete: boolean;
-  judgeCount: bigint;
-  totalScores: bigint[];
-  startTime: bigint;
-  endTime: bigint;
-}
+type MarketDetails = [
+  string,      // token
+  bigint,      // debateId
+  boolean,     // resolved
+  bigint,      // winningOutcome
+  [            // bondingCurve
+    bigint,    // target
+    bigint,    // current
+    bigint,    // basePrice
+    bigint,    // currentPrice
+    boolean,   // isFulfilled
+    bigint     // endTime
+  ],
+  bigint       // totalBondingAmount
+];
+
+type Outcome = {
+  name: string;
+  index: bigint;
+  isValid: boolean;
+};
 
 interface DebateViewProps {
   debateId: number;
 }
 
 export function DebateView({ debateId }: DebateViewProps) {
-  const { address, isConnected } = useAccount();
-  const [scores, setScores] = useState<number[]>(Array(OUTCOME_COUNT).fill(0));
-  const [totalScore, setTotalScore] = useState(0);
+  const { isConnected } = useAccount();
 
   // Get debate details
   const { data: debateDetails } = useReadContract({
@@ -46,137 +56,160 @@ export function DebateView({ debateId }: DebateViewProps) {
     abi: DEBATE_FACTORY_ABI,
     functionName: 'getDebateDetails',
     args: [BigInt(debateId)],
-  });
+  }) as { data: DebateDetails | undefined };
 
-  // Get current round info
-  const { data: roundInfo } = useReadContract({
-    address: DEBATE_FACTORY_ADDRESS,
-    abi: DEBATE_FACTORY_ABI,
-    functionName: 'getRoundInfo',
-    args: [BigInt(debateId), debateDetails?.[4] ?? 0n], // currentRound
-  });
-
-  // Get judge scores for current round
-  const { data: judgeScores } = useReadContract({
-    address: DEBATE_FACTORY_ADDRESS,
-    abi: DEBATE_FACTORY_ABI,
-    functionName: 'getJudgeScores',
-    args: [BigInt(debateId), debateDetails?.[4] ?? 0n, address!],
-  });
-
-  // Get current probabilities
-  const { data: probabilities } = useReadContract({
-    address: DEBATE_FACTORY_ADDRESS,
-    abi: DEBATE_FACTORY_ABI,
-    functionName: 'getCurrentProbabilities',
+  // Get market details
+  const { data: marketId } = useReadContract({
+    address: MARKET_FACTORY_ADDRESS,
+    abi: MARKET_FACTORY_ABI,
+    functionName: 'debateIdToMarketId',
     args: [BigInt(debateId)],
   });
 
-  const { writeContract: scoreRound, isLoading: isScoring } = useWriteContract({
-    address: DEBATE_FACTORY_ADDRESS,
-    abi: DEBATE_FACTORY_ABI,
-    functionName: 'scoreRound',
+  const { data: marketDetails } = useReadContract({
+    address: MARKET_FACTORY_ADDRESS,
+    abi: MARKET_FACTORY_ABI,
+    functionName: 'getMarketDetails',
+    args: marketId ? [marketId] : undefined,
+  }) as { data: MarketDetails | undefined };
+
+  // Get outcomes
+  const { data: outcomes } = useReadContract({
+    address: MARKET_FACTORY_ADDRESS,
+    abi: MARKET_FACTORY_ABI,
+    functionName: 'getOutcomes',
+    args: marketId ? [marketId] : undefined,
+  }) as { data: Outcome[] | undefined };
+
+  // Get current prices for each outcome
+  const { data: currentPrices } = useReadContracts({
+    contracts: outcomes?.map((_, index) => ({
+      address: MARKET_FACTORY_ADDRESS,
+      abi: MARKET_FACTORY_ABI,
+      functionName: 'getCurrentPrice',
+      args: [marketId, BigInt(index)],
+    })) || [],
   });
 
-  const handleScoreChange = (index: number, value: number) => {
-    const newScores = [...scores];
-    newScores[index] = value;
-    setScores(newScores);
-    setTotalScore(newScores.reduce((a, b) => a + b, 0));
-  };
+  if (!debateDetails || !marketDetails || !outcomes || !currentPrices) return <div>Loading market details...</div>;
 
-  const handleSubmitScores = () => {
-    if (totalScore !== MAX_SCORE || !debateDetails) return;
-    
-    scoreRound({
-      args: [
-        BigInt(debateId),
-        debateDetails.currentRound,
-        scores.map(s => BigInt(s))
-      ],
-    });
-  };
+  const [
+    topic,
+    startTime,
+    duration,
+    debateEndTime,
+    currentRound,
+    totalRounds,
+    isActive,
+    creator,
+    market,
+    judges,
+    hasOutcome,
+    finalOutcome
+  ] = debateDetails;
 
-  if (!debateDetails) return <div>Loading debate details...</div>;
+  const [
+    token,
+    _debateId,
+    resolved,
+    winningOutcome,
+    bondingCurve,
+    totalBondingAmount
+  ] = marketDetails;
 
-  const isJudge = debateDetails.judges.includes(address as `0x${string}`);
-  const canScore = isJudge && debateDetails.isActive && !judgeScores?.some(s => s > 0n);
+  const endDate = new Date(Number(debateEndTime) * 1000);
+  const timeRemaining = Math.max(0, Number(debateEndTime) - Math.floor(Date.now() / 1000));
+  const daysRemaining = Math.floor(timeRemaining / (24 * 60 * 60));
+  const hoursRemaining = Math.floor((timeRemaining % (24 * 60 * 60)) / 3600);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{debateDetails.topic}</CardTitle>
-        <CardDescription>
-          Round {Number(debateDetails.currentRound)} of {Number(debateDetails.totalRounds)}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {/* Debate Status */}
-          <div>
-            <h3 className="font-semibold">Status</h3>
-            <p>Active: {debateDetails.isActive ? 'Yes' : 'No'}</p>
-            <p>Time Remaining: {Math.max(0, Number(debateDetails.debateEndTime - BigInt(Date.now() / 1000)))} seconds</p>
-            {debateDetails.hasOutcome && <p>Final Outcome: {Number(debateDetails.finalOutcome)}</p>}
-          </div>
-
-          {/* Current Round */}
-          {roundInfo && (
-            <div>
-              <h3 className="font-semibold">Current Round</h3>
-              <p>Complete: {roundInfo.isComplete ? 'Yes' : 'No'}</p>
-              <p>Judges Scored: {Number(roundInfo.judgeCount)}</p>
-              <div className="mt-2">
-                <h4>Total Scores:</h4>
-                {roundInfo.totalScores.map((score, i) => (
-                  <p key={i}>Outcome {i}: {Number(score)}</p>
-                ))}
+    <div className="container mx-auto p-4 space-y-4">
+      {/* Debate Information */}
+      <Card className="bg-[#1C2128] border-0">
+        <CardContent className="p-6">
+          <div className="space-y-4">
+            <div className="flex justify-between items-start">
+              <div>
+                <h2 className="text-xl font-bold mb-2">{topic}</h2>
+                <div className="text-sm text-gray-400">Created by {formatAddress(creator)}</div>
               </div>
-            </div>
-          )}
-
-          {/* Probabilities */}
-          {probabilities && (
-            <div>
-              <h3 className="font-semibold">Current Probabilities</h3>
-              {probabilities.map((prob, i) => (
-                <p key={i}>Outcome {i}: {Number(prob) / 100}%</p>
-              ))}
-            </div>
-          )}
-
-          {/* Scoring Interface */}
-          {canScore && (
-            <div className="space-y-4">
-              <h3 className="font-semibold">Score Round</h3>
-              <p className="text-sm text-gray-500">
-                Assign scores to each outcome (total must equal {MAX_SCORE})
-              </p>
-              {scores.map((score, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <Label>Outcome {i}</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    max={MAX_SCORE}
-                    value={score}
-                    onChange={(e) => handleScoreChange(i, Number(e.target.value))}
-                  />
+              <div className="text-right">
+                <div className="text-sm font-medium">
+                  {isActive ? (
+                    <span className="text-green-400">Active</span>
+                  ) : (
+                    <span className="text-red-400">Ended</span>
+                  )}
                 </div>
-              ))}
-              <div className="flex justify-between items-center">
-                <p>Total Score: {totalScore}/{MAX_SCORE}</p>
-                <Button
-                  onClick={handleSubmitScores}
-                  disabled={totalScore !== MAX_SCORE || isScoring}
-                >
-                  {isScoring ? 'Submitting...' : 'Submit Scores'}
-                </Button>
+                {isActive && (
+                  <div className="text-sm text-gray-400">
+                    {daysRemaining}d {hoursRemaining}h remaining
+                  </div>
+                )}
               </div>
             </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-gray-800">
+              <div>
+                <div className="text-sm text-gray-400">Total Volume</div>
+                <div className="font-medium">${formatEther(totalBondingAmount)}</div>
+              </div>
+              <div>
+                <div className="text-sm text-gray-400">Round</div>
+                <div className="font-medium">{currentRound.toString()}/{totalRounds.toString()}</div>
+              </div>
+              <div>
+                <div className="text-sm text-gray-400">End Date</div>
+                <div className="font-medium">{endDate.toLocaleDateString()}</div>
+              </div>
+              <div>
+                <div className="text-sm text-gray-400">Judges</div>
+                <div className="font-medium">{judges.length}</div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Outcomes List */}
+      <Card className="bg-[#1C2128] border-0">
+        <CardContent className="p-6">
+          <div className="flex justify-between items-center mb-4">
+            <div className="text-sm text-gray-400">OUTCOME</div>
+            <div className="text-sm text-gray-400">% CHANCE ↻</div>
+          </div>
+          <div className="space-y-4">
+            {outcomes.map((outcome, i) => {
+              const currentPrice = Number(currentPrices[i] || 0n) / 100; // Convert basis points to percentage
+              const volume = formatEther(marketDetails[5]);
+              return (
+                <div key={i} className="border-t border-gray-800 pt-4">
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <div className="font-medium">{outcome.name}</div>
+                      <div className="text-sm text-gray-400">${volume} Vol.</div>
+                    </div>
+                    <div className="text-xl font-medium">{currentPrice}%</div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      className="flex-1 bg-[#1F3229] text-[#3FB950] border-[#238636] hover:bg-[#238636] hover:text-white"
+                    >
+                      Buy Yes {(currentPrice/100).toFixed(1)}¢
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      className="flex-1 bg-[#3B2325] text-[#F85149] border-[#F85149] hover:bg-[#F85149] hover:text-white"
+                    >
+                      Buy No {((100-currentPrice)/100).toFixed(1)}¢
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 } 
