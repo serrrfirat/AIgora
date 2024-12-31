@@ -3,8 +3,9 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DEBATE_FACTORY_ADDRESS, DEBATE_FACTORY_ABI, MARKET_FACTORY_ADDRESS, MARKET_FACTORY_ABI } from '@/config/contracts';
-import { useAccount, useReadContract, useReadContracts, useWriteContract } from 'wagmi';
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { formatEther, formatAddress } from '@/lib/utils';
+import { useState, useEffect } from 'react';
 
 type DebateDetails = [
   string,      // topic
@@ -49,6 +50,8 @@ interface DebateViewProps {
 
 export function DebateView({ debateId }: DebateViewProps) {
   const { isConnected } = useAccount();
+  const [pendingTx, setPendingTx] = useState(false);
+
   // Get debate details
   const { data: debateDetails } = useReadContract({
     address: DEBATE_FACTORY_ADDRESS,
@@ -56,13 +59,6 @@ export function DebateView({ debateId }: DebateViewProps) {
     functionName: 'getDebateDetails',
     args: [BigInt(debateId)],
   }) as { data: DebateDetails | undefined };
-
-  // placeLimitOrder
-  const { writeContract: placeLimitOrder } = useWriteContract({
-    address: MARKET_FACTORY_ADDRESS,
-    abi: MARKET_FACTORY_ABI,
-    functionName: 'placeLimitOrder',
-  });
 
   // Get market details
   const { data: marketId } = useReadContract({
@@ -87,17 +83,68 @@ export function DebateView({ debateId }: DebateViewProps) {
     args: marketId ? [marketId] : undefined,
   }) as { data: Outcome[] | undefined };
 
-  // Get current prices for each outcome
-  const { data: currentPrices } = useReadContracts({
-    contracts: outcomes?.map((_, index) => ({
-      address: MARKET_FACTORY_ADDRESS,
-      abi: MARKET_FACTORY_ABI,
-      functionName: 'getCurrentPrice',
-      args: [marketId, BigInt(index)],
-    })) || [],
+  // Get current prices
+  const { data: currentPrices } = useReadContract({
+    address: MARKET_FACTORY_ADDRESS,
+    abi: MARKET_FACTORY_ABI,
+    functionName: 'getCurrentPrice',
+    args: marketId && outcomes ? [marketId, 0n] : undefined,
   });
 
-  if (!debateDetails || !marketDetails || !outcomes || !currentPrices) return <div>Loading market details...</div>;
+  const { writeContract: placeLimitOrder, data: hash, error } = useWriteContract();
+
+  const { isLoading: isConfirming, isSuccess: isOrderSuccess, data: receipt } = useWaitForTransactionReceipt({
+    hash,
+  });
+
+  useEffect(() => {
+    if (!isConfirming || error) {
+      setPendingTx(false);
+    }
+  }, [isConfirming, error]);
+
+  const handlePlaceLimitOrder = async (outcomeIndex: bigint, isLong: boolean) => {
+    console.log('Button clicked', { outcomeIndex, isLong });
+    
+    if (!marketId || !marketDetails) {
+      console.error('Market data not loaded:', { 
+        marketId: marketId, 
+        hasMarketDetails: !!marketDetails
+      });
+      return;
+    }
+    
+    setPendingTx(true);
+    try {
+      const price = isLong ? bondingCurveData.basePrice : (10000n - bondingCurveData.basePrice);
+      
+      console.log('Attempting to place order with params:', {
+        marketId,
+        outcomeIndex,
+        price,
+        amount: BigInt('1000000000000000000')
+      });
+      
+      await placeLimitOrder({
+        address: MARKET_FACTORY_ADDRESS as `0x${string}`,
+        abi: MARKET_FACTORY_ABI,
+        functionName: 'placeLimitOrder',
+        args: [
+          marketId,
+          outcomeIndex,
+          price,
+          BigInt('1000000000000000000')
+        ]
+      });
+    } catch (error) {
+      console.error('Error placing limit order:', error);
+      setPendingTx(false);
+    }
+  };
+
+  if (!debateDetails || !marketDetails || !outcomes || currentPrices === undefined) return <div>Loading market details...</div>;
+
+  console.log('Market Details:', marketDetails);
 
   const [
     topic,
@@ -114,14 +161,27 @@ export function DebateView({ debateId }: DebateViewProps) {
     finalOutcome
   ] = debateDetails;
 
+  // Extract market details as a tuple
   const [
     token,
     _debateId,
     resolved,
     winningOutcome,
-    bondingCurve,
+    bondingCurveData,
     totalBondingAmount
   ] = marketDetails;
+
+  console.log('Bonding Curve Data:', bondingCurveData);
+
+  // Access bonding curve data directly as an object
+  const {
+    target,
+    current,
+    basePrice,
+    currentPrice,
+    isFulfilled,
+    endTime
+  } = bondingCurveData;
 
   const endDate = new Date(Number(debateEndTime) * 1000);
   const timeRemaining = Math.max(0, Number(debateEndTime) - Math.floor(Date.now() / 1000));
@@ -130,6 +190,33 @@ export function DebateView({ debateId }: DebateViewProps) {
 
   return (
     <div className="container mx-auto p-4 space-y-4">
+      {/* Bonding Curve Progress */}
+      <Card className="bg-[#1C2128] border-0">
+        <CardContent className="p-6">
+          <div className="space-y-4">
+            <div className="flex justify-between items-center mb-2">
+              <div className="text-sm text-gray-400">Bonding Curve Progress</div>
+              <div className="text-sm font-medium">
+                {formatEther(current)}/${formatEther(target)}
+              </div>
+            </div>
+            <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                style={{ 
+                  width: `${Math.min(100, (Number(current) * 100) / Number(target))}%`,
+                  backgroundColor: isFulfilled ? '#3FB950' : '#2F81F7'
+                }}
+              />
+            </div>
+            <div className="flex justify-between text-xs text-gray-400">
+              <div>Current: ${formatEther(current)}</div>
+              <div>Target: ${formatEther(target)}</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Debate Information */}
       <Card className="bg-[#1C2128] border-0">
         <CardContent className="p-6">
@@ -184,9 +271,10 @@ export function DebateView({ debateId }: DebateViewProps) {
             <div className="text-sm text-gray-400">% CHANCE ↻</div>
           </div>
           <div className="space-y-4">
-            {outcomes.map((outcome, i) => {
-              const currentPrice = Number(currentPrices[i] || 0n) / 100; // Convert basis points to percentage
-              const volume = formatEther(marketDetails[5]);
+            {outcomes?.map((outcome, i) => {
+              const currentPrice = Number(currentPrices || 0n) / 100;
+              const volume = formatEther(totalBondingAmount);
+              
               return (
                 <div key={i} className="border-t border-gray-800 pt-4">
                   <div className="flex justify-between items-start mb-2">
@@ -200,14 +288,18 @@ export function DebateView({ debateId }: DebateViewProps) {
                     <Button 
                       variant="outline" 
                       className="flex-1 bg-[#1F3229] text-[#3FB950] border-[#238636] hover:bg-[#238636] hover:text-white"
+                      onClick={() => handlePlaceLimitOrder(outcome.index, true)}
+                      disabled={!isConnected || pendingTx || isConfirming || isOrderSuccess}
                     >
-                      Buy Yes {(currentPrice/100).toFixed(1)}¢
+                      {pendingTx || isConfirming || isOrderSuccess ? 'Confirming...' : `Buy Yes ${(currentPrice/100).toFixed(1)}¢`}
                     </Button>
                     <Button 
                       variant="outline" 
                       className="flex-1 bg-[#3B2325] text-[#F85149] border-[#F85149] hover:bg-[#F85149] hover:text-white"
+                      onClick={() => handlePlaceLimitOrder(outcome.index, false)}
+                      disabled={!isConnected || pendingTx || isConfirming || isOrderSuccess}
                     >
-                      Buy No {((100-currentPrice)/100).toFixed(1)}¢
+                      {pendingTx || isConfirming || isOrderSuccess ? 'Confirming...' : `Buy No ${((100-currentPrice)/100).toFixed(1)}¢`}
                     </Button>
                   </div>
                 </div>
