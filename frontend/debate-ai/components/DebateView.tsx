@@ -3,13 +3,14 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DEBATE_FACTORY_ADDRESS, DEBATE_FACTORY_ABI, MARKET_FACTORY_ADDRESS, MARKET_FACTORY_ABI } from '@/config/contracts';
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useClient } from 'wagmi';
 import { formatEther, formatAddress } from '@/lib/utils';
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { waitForTransactionReceipt } from 'viem/actions';
+import { config } from '@/config/wallet-config';
 
 type DebateDetails = [
   string,      // topic
@@ -53,7 +54,7 @@ interface DebateViewProps {
 }
 
 export function DebateView({ debateId }: DebateViewProps) {
-  const { isConnected } = useAccount();
+  const { isConnected, address } = useAccount();
   const [pendingTx, setPendingTx] = useState(false);
   const [orderType, setOrderType] = useState<'buy' | 'sell'>('buy');
   const [selectedOutcome, setSelectedOutcome] = useState<Outcome | null>(null);
@@ -119,24 +120,37 @@ export function DebateView({ debateId }: DebateViewProps) {
     hash: orderHash,
   });
 
-  useEffect(() => {
-    if (!isApproveConfirming || !isOrderConfirming) {
-      setPendingTx(false);
-    }
-  }, [isApproveConfirming, isOrderConfirming]);
+  const publicClient = useClient({ config });
 
-  const handlePlaceLimitOrder = async () => {
-    if (!marketId || !marketDetails) {
-      console.error('Market data not loaded');
-      return;
-    }
+  // Add allowance check
+  const { data: currentAllowance } = useReadContract({
+    address: marketDetails?.[0] as `0x${string}`,
+    abi: [{
+      name: 'allowance',
+      type: 'function',
+      stateMutability: 'view',
+      inputs: [
+        { name: 'owner', type: 'address' },
+        { name: 'spender', type: 'address' }
+      ],
+      outputs: [{ type: 'uint256' }]
+    }],
+    functionName: 'allowance',
+    args: address && marketDetails ? [address, MARKET_FACTORY_ADDRESS] : undefined,
+  });
 
+  const handleApproveToken = async (amountInWei: bigint) => {
+    if (!marketDetails || !address) return false;
+    
     try {
-      // Convert amount to wei (18 decimals)
-      const amountInWei = BigInt(Math.floor(parseFloat(amount) * 10**18));
-      
-      // First approve the token
-      const tokenContract = {
+      // Check if we already have sufficient allowance
+      if (currentAllowance && currentAllowance >= amountInWei) {
+        console.log('Already approved sufficient amount');
+        return true;
+      }
+
+      // If not, proceed with approval
+      approveToken({
         address: marketDetails[0] as `0x${string}`,
         abi: [{
           name: 'approve',
@@ -147,19 +161,87 @@ export function DebateView({ debateId }: DebateViewProps) {
             { name: 'amount', type: 'uint256' }
           ],
           outputs: [{ type: 'bool' }]
-        }]
-      };
-
-      // Approve tokens
-      approveToken({
-        ...tokenContract,
+        }],
         functionName: 'approve',
         args: [MARKET_FACTORY_ADDRESS, amountInWei]
       });
-  
-      setPendingTx(true);
+
+      // Wait for approval hash
+      while (!approveHash) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      // Wait for approval confirmation
+      if (approveHash && publicClient) {
+        await waitForTransactionReceipt(publicClient as any, {
+          hash: approveHash,
+        });
+        return true;
+      }
     } catch (error) {
       console.error('Error in approval:', error);
+      return false;
+    }
+    return false;
+  };
+
+  
+
+  const handlePlaceLimitOrder = async (outcomeIndex: bigint, isLong: boolean) => {
+    if (!marketId || !marketDetails || !publicClient) {
+      console.error('Market data not loaded or client not ready', { marketId, marketDetails });
+      return;
+    }
+
+    try {
+      setPendingTx(true);
+      console.log("Creating order for", amount, "of", isLong ? "Yes" : "No");
+      const amountInWei = BigInt(Math.floor(parseFloat(amount) * 10**18));
+      
+      // First approve
+      const approved = await handleApproveToken(amountInWei);
+      if (!approved) {
+        console.error('Approval failed');
+        setPendingTx(false);
+        return;
+      }
+
+      // Then place order
+      console.log('Market details:', marketDetails);
+      const bondingCurve = marketDetails[4]; // This is the bonding curve object
+      console.log('Bonding curve:', bondingCurve);
+      
+      const price = isLong ? bondingCurve.basePrice : (10000n - bondingCurve.basePrice);
+      console.log('Base price:', bondingCurve.basePrice.toString());
+      console.log('Calculated price:', price.toString());
+      
+      console.log('Placing order with params:', {
+        marketId: marketId.toString(),
+        outcomeIndex: outcomeIndex.toString(),
+        price: price.toString(),
+        amountInWei: amountInWei.toString()
+      });
+
+      const orderResult = await placeLimitOrder({
+        address: MARKET_FACTORY_ADDRESS as `0x${string}`,
+        abi: MARKET_FACTORY_ABI,
+        functionName: 'placeLimitOrder',
+        args: [marketId, outcomeIndex, price, amountInWei]
+      });
+
+      if (orderResult) {
+        console.log('Order submitted, waiting for confirmation...');
+        await waitForTransactionReceipt(publicClient as any, {
+          hash: orderResult,
+        });
+        console.log('Order confirmed!');
+      } else {
+        console.error('No transaction hash received from order placement');
+      }
+    } catch (error) {
+      console.error('Error placing order:', error);
+    } finally {
+      setPendingTx(false);
     }
   };
 
@@ -181,44 +263,8 @@ export function DebateView({ debateId }: DebateViewProps) {
     const newAmount = Math.max(0, currentAmount + delta);
     handleAmountChange(newAmount.toString());
   };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const placeBid = async () => {
-    if (isApproveConfirmed && selectedOutcome) {
-      console.log('Placing bid...');
-      try {
-        const amountInWei = BigInt(Math.floor(parseFloat(amount) * 10**18));
-        const price = orderType === 'buy' ? bondingCurveData[2] : (10000n - bondingCurveData[2]);
-
-         placeLimitOrder({
-          address: MARKET_FACTORY_ADDRESS as `0x${string}`,
-          abi: MARKET_FACTORY_ABI,
-          functionName: 'placeLimitOrder',
-          args: [
-            marketId,
-            selectedOutcome.index,
-            price,
-            amountInWei
-          ]
-        });
-      } catch (error) {
-        console.error('Error placing order:', error);
-      }
-    }
-  };
-
-
-  useEffect(() => {
-    if (isApproveConfirmed && selectedOutcome && pendingTx) {
-      placeBid();
-    }
-  }, [isApproveConfirmed, placeBid, selectedOutcome, pendingTx]);
-
-   
 
   if (!debateDetails || !marketDetails || !outcomes || currentPrices === undefined) return <div>Loading market details...</div>;
-
-  console.log('Market Details:', marketDetails);
-
   const [
     topic,
     startTime,
@@ -244,7 +290,6 @@ export function DebateView({ debateId }: DebateViewProps) {
     totalBondingAmount
   ] = marketDetails;
 
-  console.log('Bonding Curve Data:', bondingCurveData);
 
   // Access bonding curve data directly as an object
   const {
