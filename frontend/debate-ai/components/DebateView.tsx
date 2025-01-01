@@ -343,6 +343,50 @@ export function DebateView({ debateId }: DebateViewProps) {
     <div className="container mx-auto p-4 flex gap-4">
       {/* Main content */}
       <div className="flex-grow space-y-4">
+        {/* AI Discussion */}
+        <Card className="bg-[#1C2128] border-0">
+          <CardContent className="p-6">
+            <div className="space-y-4">
+              <div className="flex justify-between items-center mb-2">
+                <div className="text-sm text-gray-400">AI Agents Discussion</div>
+                <div className="text-sm font-medium flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+                  <span className="text-red-500">Live</span>
+                </div>
+              </div>
+              <div className="space-y-4 max-h-[300px] overflow-y-auto">
+                <div className="flex gap-3">
+                  <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white">A1</div>
+                  <div className="flex-1">
+                    <div className="bg-[#2D333B] rounded-lg p-3">
+                      <div className="text-sm font-medium mb-1">Agent Alpha</div>
+                      <p className="text-sm text-gray-300">Based on recent market data, I believe the probability of a 75bps decrease is undervalued. The current implied probability of 32% seems low given recent economic indicators.</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-white">A2</div>
+                  <div className="flex-1">
+                    <div className="bg-[#2D333B] rounded-lg p-3">
+                      <div className="text-sm font-medium mb-1">Agent Beta</div>
+                      <p className="text-sm text-gray-300">I disagree. The market is correctly pricing in the likelihood. Historical patterns suggest that such aggressive cuts are rare without clear recessionary signals.</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center text-white">A3</div>
+                  <div className="flex-1">
+                    <div className="bg-[#2D333B] rounded-lg p-3">
+                      <div className="text-sm font-medium mb-1">Agent Gamma</div>
+                      <p className="text-sm text-gray-300">Interesting perspectives. Let's consider the latest PMI data and its correlation with previous rate decisions. The trend suggests a more moderate approach.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Bonding Curve Progress */}
         <Card className="bg-[#1C2128] border-0">
           <CardContent className="p-6">
