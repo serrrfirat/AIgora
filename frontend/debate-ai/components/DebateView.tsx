@@ -431,6 +431,15 @@ export function DebateView({ debateId }: DebateViewProps) {
                   ? ((Number(volume) / Number(formattedTotalVolume)) * 100).toFixed(1)
                   : '0';
                 
+                // Calculate implied probability based on volume
+                const impliedProbability = formattedTotalVolume !== '0'
+                  ? ((Number(volume) / Number(formattedTotalVolume)) * 100).toFixed(1)
+                  : currentPrice.toFixed(1);
+                
+                // Calculate prices based on probability
+                const yesPrice = (Number(impliedProbability) / 100).toFixed(2);
+                const noPrice = (1 - Number(impliedProbability) / 100).toFixed(2);
+                
                 return (
                   <div key={outcome.index.toString()} className="border-t border-gray-800 pt-4">
                     <div className="flex justify-between items-start mb-2">
@@ -441,7 +450,7 @@ export function DebateView({ debateId }: DebateViewProps) {
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-xl font-medium">{currentPrice}%</div>
+                        <div className="text-xl font-medium">{impliedProbability}%</div>
                         <div className="text-sm text-gray-400">
                           Implied Probability
                         </div>
@@ -454,7 +463,7 @@ export function DebateView({ debateId }: DebateViewProps) {
                         onClick={() => handlePlaceLimitOrder(outcome.index, true)}
                         disabled={!isConnected || pendingTx || isApprovePending || isOrderPending}
                       >
-                        {pendingTx || isApprovePending || isOrderPending ? 'Confirming...' : `Buy Yes ${(currentPrice/100).toFixed(1)}¢`}
+                        {pendingTx || isApprovePending || isOrderPending ? 'Confirming...' : `Buy Yes ${yesPrice}¢`}
                       </Button>
                       <Button 
                         variant="outline" 
@@ -462,7 +471,7 @@ export function DebateView({ debateId }: DebateViewProps) {
                         onClick={() => handlePlaceLimitOrder(outcome.index, false)}
                         disabled={!isConnected || pendingTx || isApprovePending || isOrderPending}
                       >
-                        {pendingTx || isApprovePending || isOrderPending ? 'Confirming...' : `Buy No ${((100-currentPrice)/100).toFixed(1)}¢`}
+                        {pendingTx || isApprovePending || isOrderPending ? 'Confirming...' : `Buy No ${noPrice}¢`}
                       </Button>
                     </div>
                   </div>
@@ -543,8 +552,16 @@ export function DebateView({ debateId }: DebateViewProps) {
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Avg price</span>
-                  <span>{selectedOutcome && outcomePrices 
-                    ? `${(Number(outcomePrices[Number(selectedOutcome.index)]) / 100).toFixed(1)}¢` 
+                  <span>{selectedOutcome && outcomePrices && outcomeVolumes && formattedTotalVolume ? 
+                    (() => {
+                      const volume = formatEther(outcomeVolumes[Number(selectedOutcome.index)]);
+                      const impliedProbability = formattedTotalVolume !== '0'
+                        ? (Number(volume) / Number(formattedTotalVolume))
+                        : Number(outcomePrices[Number(selectedOutcome.index)]) / 10000;
+                      return orderType === 'sell'
+                        ? `${impliedProbability.toFixed(2)}¢`
+                        : `${(1 - impliedProbability).toFixed(2)}¢`;
+                    })()
                     : '-'}</span>
                 </div>
                 <div className="flex justify-between text-sm">
