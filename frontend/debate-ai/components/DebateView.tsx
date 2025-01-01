@@ -367,44 +367,71 @@ export function DebateView({ debateId }: DebateViewProps) {
           >
             <div className="text-sm text-gray-400">AI Agents Discussion</div>
             <div className="flex items-center gap-2">
-              <div className="text-sm font-medium flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
-                <span className="text-red-500">Live</span>
-              </div>
-              <ChevronDown className={`w-5 h-5 transition-transform ${expandedCards.aiDiscussion ? 'rotate-0' : '-rotate-90'}`} />
+              {bondingCurve?.isFulfilled ? (
+                <>
+                  <div className="text-sm font-medium flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+                    <span className="text-red-500">Live</span>
+                  </div>
+                  <ChevronDown className={`w-5 h-5 transition-transform ${expandedCards.aiDiscussion ? 'rotate-0' : '-rotate-90'}`} />
+                </>
+              ) : (
+                <div className="text-sm font-medium text-gray-400">
+                  Locked 🔒
+                </div>
+              )}
             </div>
           </div>
           {expandedCards.aiDiscussion && (
             <CardContent className="pt-0">
-              <div className="space-y-4 max-h-[300px] overflow-y-auto">
-                <div className="flex gap-3">
-                  <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white">A1</div>
-                  <div className="flex-1">
-                    <div className="bg-[#2D333B] rounded-lg p-3">
-                      <div className="text-sm font-medium mb-1">Agent Alpha</div>
-                      <p className="text-sm text-gray-300">Based on recent market data, I believe the probability of a 75bps decrease is undervalued. The current implied probability of 32% seems low given recent economic indicators.</p>
+              {bondingCurve?.isFulfilled ? (
+                // Show AI discussion when bonding curve is fulfilled
+                <div className="space-y-4 max-h-[300px] overflow-y-auto">
+                  <div className="flex gap-3">
+                    <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white">A1</div>
+                    <div className="flex-1">
+                      <div className="bg-[#2D333B] rounded-lg p-3">
+                        <div className="text-sm font-medium mb-1">Agent Alpha</div>
+                        <p className="text-sm text-gray-300">Based on recent market data, I believe the probability of a 75bps decrease is undervalued. The current implied probability of 32% seems low given recent economic indicators.</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-white">A2</div>
+                    <div className="flex-1">
+                      <div className="bg-[#2D333B] rounded-lg p-3">
+                        <div className="text-sm font-medium mb-1">Agent Beta</div>
+                        <p className="text-sm text-gray-300">I disagree. The market is correctly pricing in the likelihood. Historical patterns suggest that such aggressive cuts are rare without clear recessionary signals.</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center text-white">A3</div>
+                    <div className="flex-1">
+                      <div className="bg-[#2D333B] rounded-lg p-3">
+                        <div className="text-sm font-medium mb-1">Agent Gamma</div>
+                        <p className="text-sm text-gray-300">Interesting perspectives. Let's consider the latest PMI data and its correlation with previous rate decisions. The trend suggests a more moderate approach.</p>
+                      </div>
                     </div>
                   </div>
                 </div>
-                <div className="flex gap-3">
-                  <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-white">A2</div>
-                  <div className="flex-1">
-                    <div className="bg-[#2D333B] rounded-lg p-3">
-                      <div className="text-sm font-medium mb-1">Agent Beta</div>
-                      <p className="text-sm text-gray-300">I disagree. The market is correctly pricing in the likelihood. Historical patterns suggest that such aggressive cuts are rare without clear recessionary signals.</p>
+              ) : (
+                // Show teaser when bonding curve is not fulfilled
+                <div className="flex flex-col items-center justify-center py-8 space-y-4">
+                  <div className="w-16 h-16 bg-[#2D333B] rounded-full flex items-center justify-center">
+                    <div className="text-2xl">🤖</div>
+                  </div>
+                  <div className="text-center space-y-2">
+                    <h3 className="font-medium">AI Agents are waiting to start</h3>
+                    <p className="text-sm text-gray-400">
+                      Once the bonding curve target is reached, three expert AI agents will begin analyzing and debating this topic in real-time.
+                    </p>
+                    <div className="text-sm text-blue-400">
+                      Progress: {((Number(bondingCurve?.current || 0) * 100) / Number(bondingCurve?.target || 1)).toFixed(1)}% to unlock
                     </div>
                   </div>
                 </div>
-                <div className="flex gap-3">
-                  <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center text-white">A3</div>
-                  <div className="flex-1">
-                    <div className="bg-[#2D333B] rounded-lg p-3">
-                      <div className="text-sm font-medium mb-1">Agent Gamma</div>
-                      <p className="text-sm text-gray-300">Interesting perspectives. Let's consider the latest PMI data and its correlation with previous rate decisions. The trend suggests a more moderate approach.</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              )}
             </CardContent>
           )}
         </Card>
