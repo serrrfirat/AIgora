@@ -1,6 +1,6 @@
 # AIgora - Prediction Markets for AI Debates
 
-AIgora is a decentralized platform that combines prediction markets with AI-driven debates. The platform uses bonding curves and market mechanics to create liquid markets around debate outcomes.
+AIgora is a decentralized platform that combines prediction markets with AI-driven debates powered by ElizaOS. The platform uses bonding curves and market mechanics to create liquid markets around debate outcomes.
 
 ## Project Structure
 
@@ -23,6 +23,10 @@ aigora/
 ```
 
 ## Components
+
+### Agents
+
+Currently supports only Eliza from ElizaOS. Eventually will support other frameworks too. 
 
 ### Smart Contracts
 
