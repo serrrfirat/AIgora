@@ -3,7 +3,7 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DEBATE_FACTORY_ADDRESS, DEBATE_FACTORY_ABI, MARKET_FACTORY_ADDRESS, MARKET_FACTORY_ABI } from '@/config/contracts';
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useClient } from 'wagmi';
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useClient, useRefetchContext } from 'wagmi';
 import { formatEther, formatAddress } from '@/lib/utils';
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { waitForTransactionReceipt } from 'viem/actions';
 import { config } from '@/config/wallet-config';
 import { ChevronDown } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 type DebateDetails = [
   string,      // topic
@@ -70,6 +71,8 @@ export function DebateView({ debateId }: DebateViewProps) {
     outcomes: true
   });
 
+  const router = useRouter();
+
   const toggleCard = (cardName: keyof typeof expandedCards) => {
     setExpandedCards(prev => ({
       ...prev,
@@ -85,60 +88,68 @@ export function DebateView({ debateId }: DebateViewProps) {
     args: [BigInt(debateId)],
   }) as { data: DebateDetails | undefined };
 
-  // Get market details
-  const { data: marketId } = useReadContract({
+  // Get all the contract reads with refetch functions
+  const { data: marketId, refetch: refetchMarketId } = useReadContract({
     address: MARKET_FACTORY_ADDRESS,
     abi: MARKET_FACTORY_ABI,
     functionName: 'debateIdToMarketId',
     args: [BigInt(debateId)],
   });
 
-  const { data: marketDetails } = useReadContract({
+  const { data: marketDetails, refetch: refetchMarketDetails } = useReadContract({
     address: MARKET_FACTORY_ADDRESS,
     abi: MARKET_FACTORY_ABI,
     functionName: 'getMarketDetails',
     args: marketId ? [marketId] : undefined,
-  }) as { data: MarketDetails | undefined };
+  }) as { data: MarketDetails | undefined, refetch: () => void };
 
-  // Get outcomes
-  const { data: outcomes } = useReadContract({
+  const { data: outcomes, refetch: refetchOutcomes } = useReadContract({
     address: MARKET_FACTORY_ADDRESS,
     abi: MARKET_FACTORY_ABI,
     functionName: 'getOutcomes',
     args: marketId ? [marketId] : undefined,
-  }) as { data: Outcome[] | undefined };
+  }) as { data: Outcome[] | undefined, refetch: () => void };
 
-  // Get current prices for all outcomes
-  const { data: outcomePrices } = useReadContract({
+  const { data: outcomePrices, refetch: refetchPrices } = useReadContract({
     address: MARKET_FACTORY_ADDRESS,
     abi: MARKET_FACTORY_ABI,
     functionName: 'getMarketPrices',
     args: marketId ? [marketId] : undefined,
   });
 
-  // Get volumes for all outcomes
-  const { data: outcomeVolumes } = useReadContract({
+  const { data: outcomeVolumes, refetch: refetchVolumes } = useReadContract({
     address: MARKET_FACTORY_ADDRESS,
     abi: MARKET_FACTORY_ABI,
     functionName: 'getMarketVolumes',
     args: marketId ? [marketId] : undefined,
   });
 
-  // Get total volume
-  const { data: totalVolume } = useReadContract({
+  const { data: totalVolume, refetch: refetchTotalVolume } = useReadContract({
     address: MARKET_FACTORY_ADDRESS,
     abi: MARKET_FACTORY_ABI,
     functionName: 'getTotalVolume',
     args: marketId ? [marketId] : undefined,
   });
 
-  // Get bonding curve details
-  const { data: bondingCurveDetails } = useReadContract({
+  const { data: bondingCurveDetails, refetch: refetchBondingCurve } = useReadContract({
     address: MARKET_FACTORY_ADDRESS,
     abi: MARKET_FACTORY_ABI,
     functionName: 'getBondingCurveDetails',
     args: marketId ? [marketId] : undefined,
-  }) as { data: [bigint, bigint, bigint, bigint, boolean, bigint] | undefined };
+  }) as { data: [bigint, bigint, bigint, bigint, boolean, bigint] | undefined, refetch: () => void };
+
+  // Function to refetch all data
+  const refetchAllData = async () => {
+    await Promise.all([
+      refetchMarketId(),
+      refetchMarketDetails(),
+      refetchOutcomes(),
+      refetchPrices(),
+      refetchVolumes(),
+      refetchTotalVolume(),
+      refetchBondingCurve()
+    ]);
+  };
 
   // Get user positions if connected
   const { data: userPositions } = useReadContract({
@@ -180,6 +191,29 @@ export function DebateView({ debateId }: DebateViewProps) {
   const { isLoading: isOrderConfirming, isSuccess: isOrderConfirmed } = useWaitForTransactionReceipt({
     hash: orderHash,
   });
+
+  // Add effect to handle order confirmation
+  useEffect(() => {
+    if (isOrderConfirmed) {
+      console.log('Order confirmed, refreshing data...');
+      // Reset form
+      setAmount('0');
+      setPotentialReturn('0.00');
+      setSelectedOutcome(null);
+      
+      // Refetch all data
+      const refreshData = async () => {
+        try {
+          await refetchAllData();
+          console.log('Data refreshed successfully');
+        } catch (error) {
+          console.error('Error refreshing data:', error);
+        }
+      };
+      
+      refreshData();
+    }
+  }, [isOrderConfirmed]);
 
   const publicClient = useClient({ config });
 
@@ -704,7 +738,16 @@ export function DebateView({ debateId }: DebateViewProps) {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Shares</span>
-                  <span>{parseFloat(amount) ? (parseFloat(amount) / 0.01).toFixed(2) : '0.00'}</span>
+                  <span>{selectedOutcome && outcomePrices && outcomeVolumes && formattedTotalVolume && parseFloat(amount) ? 
+                    (() => {
+                      const volume = formatEther(outcomeVolumes[Number(selectedOutcome.index)]);
+                      const impliedProbability = formattedTotalVolume !== '0'
+                        ? (Number(volume) / Number(formattedTotalVolume))
+                        : Number(outcomePrices[Number(selectedOutcome.index)]) / 10000;
+                      const avgPrice = orderType === 'sell' ? impliedProbability : (1 - impliedProbability);
+                      return (parseFloat(amount) / avgPrice).toFixed(2);
+                    })()
+                    : '0.00'}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Potential return</span>
