@@ -460,18 +460,28 @@ export function DebateView({ debateId }: DebateViewProps) {
                       <Button 
                         variant="outline" 
                         className="flex-1 bg-[#1F3229] text-[#3FB950] border-[#238636] hover:bg-[#238636] hover:text-white"
-                        onClick={() => handlePlaceLimitOrder(outcome.index, true)}
-                        disabled={!isConnected || pendingTx || isApprovePending || isOrderPending}
+                        onClick={() => {
+                          setSelectedOutcome(outcome);
+                          setOrderType('buy');
+                          setAmount('1');
+                          handleAmountChange('1');
+                        }}
+                        disabled={!isConnected}
                       >
-                        {pendingTx || isApprovePending || isOrderPending ? 'Confirming...' : `Buy Yes ${yesPrice}¢`}
+                        {`Buy Yes ${yesPrice}¢`}
                       </Button>
                       <Button 
                         variant="outline" 
                         className="flex-1 bg-[#3B2325] text-[#F85149] border-[#F85149] hover:bg-[#F85149] hover:text-white"
-                        onClick={() => handlePlaceLimitOrder(outcome.index, false)}
-                        disabled={!isConnected || pendingTx || isApprovePending || isOrderPending}
+                        onClick={() => {
+                          setSelectedOutcome(outcome);
+                          setOrderType('buy');
+                          setAmount('1');
+                          handleAmountChange('1');
+                        }}
+                        disabled={!isConnected}
                       >
-                        {pendingTx || isApprovePending || isOrderPending ? 'Confirming...' : `Buy No ${noPrice}¢`}
+                        {`Buy No ${noPrice}¢`}
                       </Button>
                     </div>
                   </div>
