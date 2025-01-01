@@ -11,6 +11,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { waitForTransactionReceipt } from 'viem/actions';
 import { config } from '@/config/wallet-config';
+import { ChevronDown } from 'lucide-react';
 
 type DebateDetails = [
   string,      // topic
@@ -60,6 +61,21 @@ export function DebateView({ debateId }: DebateViewProps) {
   const [selectedOutcome, setSelectedOutcome] = useState<Outcome | null>(null);
   const [amount, setAmount] = useState<string>('0');
   const [potentialReturn, setPotentialReturn] = useState<string>('0.00');
+
+  // Add state for tracking expanded cards
+  const [expandedCards, setExpandedCards] = useState({
+    aiDiscussion: true,
+    bondingCurve: true,
+    debateInfo: true,
+    outcomes: true
+  });
+
+  const toggleCard = (cardName: keyof typeof expandedCards) => {
+    setExpandedCards(prev => ({
+      ...prev,
+      [cardName]: !prev[cardName]
+    }));
+  };
 
   // Get debate details
   const { data: debateDetails } = useReadContract({
@@ -345,15 +361,21 @@ export function DebateView({ debateId }: DebateViewProps) {
       <div className="flex-grow space-y-4">
         {/* AI Discussion */}
         <Card className="bg-[#1C2128] border-0">
-          <CardContent className="p-6">
-            <div className="space-y-4">
-              <div className="flex justify-between items-center mb-2">
-                <div className="text-sm text-gray-400">AI Agents Discussion</div>
-                <div className="text-sm font-medium flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
-                  <span className="text-red-500">Live</span>
-                </div>
+          <div 
+            className="p-6 cursor-pointer flex justify-between items-center"
+            onClick={() => toggleCard('aiDiscussion')}
+          >
+            <div className="text-sm text-gray-400">AI Agents Discussion</div>
+            <div className="flex items-center gap-2">
+              <div className="text-sm font-medium flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+                <span className="text-red-500">Live</span>
               </div>
+              <ChevronDown className={`w-5 h-5 transition-transform ${expandedCards.aiDiscussion ? 'rotate-0' : '-rotate-90'}`} />
+            </div>
+          </div>
+          {expandedCards.aiDiscussion && (
+            <CardContent className="pt-0">
               <div className="space-y-4 max-h-[300px] overflow-y-auto">
                 <div className="flex gap-3">
                   <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white">A1</div>
@@ -383,156 +405,191 @@ export function DebateView({ debateId }: DebateViewProps) {
                   </div>
                 </div>
               </div>
-            </div>
-          </CardContent>
+            </CardContent>
+          )}
         </Card>
 
         {/* Bonding Curve Progress */}
         <Card className="bg-[#1C2128] border-0">
-          <CardContent className="p-6">
-            <div className="space-y-4">
-              <div className="flex justify-between items-center mb-2">
-                <div className="text-sm text-gray-400">Bonding Curve Progress</div>
-                <div className="text-sm font-medium">
-                  {formatEther(current)}/${formatEther(target)}
+          <div 
+            className="p-6 cursor-pointer flex justify-between items-center"
+            onClick={() => toggleCard('bondingCurve')}
+          >
+            <div className="text-sm text-gray-400">Bonding Curve Progress</div>
+            <div className="flex items-center gap-2">
+              <div className="text-sm font-medium">
+                {formatEther(current)}/${formatEther(target)}
+              </div>
+              <ChevronDown className={`w-5 h-5 transition-transform ${expandedCards.bondingCurve ? 'rotate-0' : '-rotate-90'}`} />
+            </div>
+          </div>
+          {expandedCards.bondingCurve && (
+            <CardContent className="pt-0">
+              <div className="space-y-4">
+                <div className="flex justify-between items-center mb-2">
+                  <div className="text-sm text-gray-400">Bonding Curve Progress</div>
+                  <div className="text-sm font-medium">
+                    {formatEther(current)}/{formatEther(target)}
+                  </div>
+                </div>
+                <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                    style={{ 
+                      width: `${Math.min(100, (Number(current) * 100) / Number(target))}%`,
+                      backgroundColor: isFulfilled ? '#3FB950' : '#2F81F7'
+                    }}
+                  />
+                </div>
+                <div className="flex justify-between text-xs text-gray-400">
+                  <div>Current: ${formatEther(current)}</div>
+                  <div>Target: ${formatEther(target)}</div>
                 </div>
               </div>
-              <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-blue-500 rounded-full transition-all duration-500"
-                  style={{ 
-                    width: `${Math.min(100, (Number(current) * 100) / Number(target))}%`,
-                    backgroundColor: isFulfilled ? '#3FB950' : '#2F81F7'
-                  }}
-                />
-              </div>
-              <div className="flex justify-between text-xs text-gray-400">
-                <div>Current: ${formatEther(current)}</div>
-                <div>Target: ${formatEther(target)}</div>
-              </div>
-            </div>
-          </CardContent>
+            </CardContent>
+          )}
         </Card>
 
         {/* Debate Information */}
         <Card className="bg-[#1C2128] border-0">
-          <CardContent className="p-6">
-            <div className="space-y-4">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h2 className="text-xl font-bold mb-2">{topic}</h2>
-                  <div className="text-sm text-gray-400">Created by {formatAddress(creator)}</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm font-medium">
-                    {isActive ? (
-                      <span className="text-green-400">Active</span>
-                    ) : (
-                      <span className="text-red-400">Ended</span>
+          <div 
+            className="p-6 cursor-pointer flex justify-between items-center"
+            onClick={() => toggleCard('debateInfo')}
+          >
+            <div className="text-sm text-gray-400">Debate Information</div>
+            <ChevronDown className={`w-5 h-5 transition-transform ${expandedCards.debateInfo ? 'rotate-0' : '-rotate-90'}`} />
+          </div>
+          {expandedCards.debateInfo && (
+            <CardContent className="pt-0">
+              <div className="space-y-4">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h2 className="text-xl font-bold mb-2">{topic}</h2>
+                    <div className="text-sm text-gray-400">Created by {formatAddress(creator)}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-medium">
+                      {isActive ? (
+                        <span className="text-green-400">Active</span>
+                      ) : (
+                        <span className="text-red-400">Ended</span>
+                      )}
+                    </div>
+                    {isActive && (
+                      <div className="text-sm text-gray-400">
+                        {daysRemaining}d {hoursRemaining}h remaining
+                      </div>
                     )}
                   </div>
-                  {isActive && (
-                    <div className="text-sm text-gray-400">
-                      {daysRemaining}d {hoursRemaining}h remaining
-                    </div>
-                  )}
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-gray-800">
+                  <div>
+                    <div className="text-sm text-gray-400">Total Volume</div>
+                    <div className="font-medium">${formatEther(totalBondingAmount)}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-gray-400">Round</div>
+                    <div className="font-medium">{currentRound.toString()}/{totalRounds.toString()}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-gray-400">End Date</div>
+                    <div className="font-medium">{endDate.toLocaleDateString()}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-gray-400">Judges</div>
+                    <div className="font-medium">{judges.length}</div>
+                  </div>
                 </div>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-gray-800">
-                <div>
-                  <div className="text-sm text-gray-400">Total Volume</div>
-                  <div className="font-medium">${formatEther(totalBondingAmount)}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-400">Round</div>
-                  <div className="font-medium">{currentRound.toString()}/{totalRounds.toString()}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-400">End Date</div>
-                  <div className="font-medium">{endDate.toLocaleDateString()}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-400">Judges</div>
-                  <div className="font-medium">{judges.length}</div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
+            </CardContent>
+          )}
         </Card>
 
         {/* Outcomes List */}
         <Card className="bg-[#1C2128] border-0">
-          <CardContent className="p-6">
-            <div className="flex justify-between items-center mb-4">
-              <div className="text-sm text-gray-400">OUTCOME</div>
+          <div 
+            className="p-6 cursor-pointer flex justify-between items-center"
+            onClick={() => toggleCard('outcomes')}
+          >
+            <div className="text-sm text-gray-400">OUTCOME</div>
+            <div className="flex items-center gap-2">
               <div className="text-sm text-gray-400">% CHANCE ↻</div>
+              <ChevronDown className={`w-5 h-5 transition-transform ${expandedCards.outcomes ? 'rotate-0' : '-rotate-90'}`} />
             </div>
-            <div className="space-y-4">
-              {outcomes?.map((outcome, index) => {
-                const currentPrice = Number(outcomePrices[index]) / 100;
-                const volume = outcomeVolumes ? formatEther(outcomeVolumes[index]) : '0';
-                const volumePercentage = formattedTotalVolume !== '0'
-                  ? ((Number(volume) / Number(formattedTotalVolume)) * 100).toFixed(1)
-                  : '0';
-                
-                // Calculate implied probability based on volume
-                const impliedProbability = formattedTotalVolume !== '0'
-                  ? ((Number(volume) / Number(formattedTotalVolume)) * 100).toFixed(1)
-                  : currentPrice.toFixed(1);
-                
-                // Calculate prices based on probability
-                const yesPrice = (Number(impliedProbability) / 100).toFixed(2);
-                const noPrice = (1 - Number(impliedProbability) / 100).toFixed(2);
-                
-                return (
-                  <div key={outcome.index.toString()} className="border-t border-gray-800 pt-4">
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <div className="font-medium">{outcome.name}</div>
-                        <div className="text-sm text-gray-400">
-                          ${volume} Vol. ({volumePercentage}%)
+          </div>
+          {expandedCards.outcomes && (
+            <CardContent className="pt-0">
+              <div className="flex justify-between items-center mb-4">
+                <div className="text-sm text-gray-400">OUTCOME</div>
+                <div className="text-sm text-gray-400">% CHANCE ↻</div>
+              </div>
+              <div className="space-y-4">
+                {outcomes?.map((outcome, index) => {
+                  const currentPrice = Number(outcomePrices[index]) / 100;
+                  const volume = outcomeVolumes ? formatEther(outcomeVolumes[index]) : '0';
+                  const volumePercentage = formattedTotalVolume !== '0'
+                    ? ((Number(volume) / Number(formattedTotalVolume)) * 100).toFixed(1)
+                    : '0';
+                  
+                  // Calculate implied probability based on volume
+                  const impliedProbability = formattedTotalVolume !== '0'
+                    ? ((Number(volume) / Number(formattedTotalVolume)) * 100).toFixed(1)
+                    : currentPrice.toFixed(1);
+                  
+                  // Calculate prices based on probability
+                  const yesPrice = (Number(impliedProbability) / 100).toFixed(2);
+                  const noPrice = (1 - Number(impliedProbability) / 100).toFixed(2);
+                  
+                  return (
+                    <div key={outcome.index.toString()} className="border-t border-gray-800 pt-4">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <div className="font-medium">{outcome.name}</div>
+                          <div className="text-sm text-gray-400">
+                            ${volume} Vol. ({volumePercentage}%)
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-xl font-medium">{impliedProbability}%</div>
+                          <div className="text-sm text-gray-400">
+                            Implied Probability
+                          </div>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-xl font-medium">{impliedProbability}%</div>
-                        <div className="text-sm text-gray-400">
-                          Implied Probability
-                        </div>
+                      <div className="flex gap-2">
+                        <Button 
+                          variant="outline" 
+                          className="flex-1 bg-[#1F3229] text-[#3FB950] border-[#238636] hover:bg-[#238636] hover:text-white"
+                          onClick={() => {
+                            setSelectedOutcome(outcome);
+                            setOrderType('buy');
+                            setAmount('1');
+                            handleAmountChange('1');
+                          }}
+                          disabled={!isConnected}
+                        >
+                          {`Buy Yes ${yesPrice}¢`}
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          className="flex-1 bg-[#3B2325] text-[#F85149] border-[#F85149] hover:bg-[#F85149] hover:text-white"
+                          onClick={() => {
+                            setSelectedOutcome(outcome);
+                            setOrderType('buy');
+                            setAmount('1');
+                            handleAmountChange('1');
+                          }}
+                          disabled={!isConnected}
+                        >
+                          {`Buy No ${noPrice}¢`}
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      <Button 
-                        variant="outline" 
-                        className="flex-1 bg-[#1F3229] text-[#3FB950] border-[#238636] hover:bg-[#238636] hover:text-white"
-                        onClick={() => {
-                          setSelectedOutcome(outcome);
-                          setOrderType('buy');
-                          setAmount('1');
-                          handleAmountChange('1');
-                        }}
-                        disabled={!isConnected}
-                      >
-                        {`Buy Yes ${yesPrice}¢`}
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        className="flex-1 bg-[#3B2325] text-[#F85149] border-[#F85149] hover:bg-[#F85149] hover:text-white"
-                        onClick={() => {
-                          setSelectedOutcome(outcome);
-                          setOrderType('buy');
-                          setAmount('1');
-                          handleAmountChange('1');
-                        }}
-                        disabled={!isConnected}
-                      >
-                        {`Buy No ${noPrice}¢`}
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
+                  );
+                })}
+              </div>
+            </CardContent>
+          )}
         </Card>
       </div>
 
