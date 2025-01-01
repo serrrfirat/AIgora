@@ -6,6 +6,7 @@ import { DEBATE_FACTORY_ADDRESS, DEBATE_FACTORY_ABI, MARKET_FACTORY_ADDRESS, MAR
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { formatEther, formatAddress } from '@/lib/utils';
 import { useState, useEffect } from 'react';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 
 type DebateDetails = [
   string,      // topic
@@ -92,9 +93,13 @@ export function DebateView({ debateId }: DebateViewProps) {
   });
 
   const { writeContract: placeLimitOrder, data: hash, error } = useWriteContract();
-
+  const { writeContract: approveToken, data: approveHash, error: approveError } = useWriteContract();
   const { isLoading: isConfirming, isSuccess: isOrderSuccess, data: receipt } = useWaitForTransactionReceipt({
     hash,
+  });
+
+  const { isLoading: isConfirmingApprove, isSuccess: isApproveSuccess } = useWaitForTransactionReceipt({
+    hash: approveHash,
   });
 
   useEffect(() => {
@@ -116,6 +121,28 @@ export function DebateView({ debateId }: DebateViewProps) {
     
     setPendingTx(true);
     try {
+      // First approve the token
+      const tokenContract = {
+        address: marketDetails[0] as `0x${string}`, // token address from market details
+        abi: [{
+          name: 'approve',
+          type: 'function',
+          stateMutability: 'nonpayable',
+          inputs: [
+            { name: 'spender', type: 'address' },
+            { name: 'amount', type: 'uint256' }
+          ],
+          outputs: [{ type: 'bool' }]
+        }]
+      };
+
+      // Approve the market to spend tokens
+      await approveToken({
+        ...tokenContract,
+        functionName: 'approve',
+        args: [MARKET_FACTORY_ADDRESS, BigInt('1000000000000000000')]
+      });
+
       const price = isLong ? bondingCurveData.basePrice : (10000n - bondingCurveData.basePrice);
       
       console.log('Attempting to place order with params:', {
@@ -125,6 +152,7 @@ export function DebateView({ debateId }: DebateViewProps) {
         amount: BigInt('1000000000000000000')
       });
       
+      // Then place the order
       await placeLimitOrder({
         address: MARKET_FACTORY_ADDRESS as `0x${string}`,
         abi: MARKET_FACTORY_ABI,
@@ -308,6 +336,23 @@ export function DebateView({ debateId }: DebateViewProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Add the confirmation dialog */}
+      <Dialog open={pendingTx || isConfirmingApprove || isConfirming} onOpenChange={() => {}}>
+        <DialogContent className="sm:max-w-[425px]">
+          <div className="flex flex-col items-center gap-4 py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+            <p className="text-lg font-semibold">Transaction Being Processed</p>
+            <p className="text-sm text-gray-500">
+              {isConfirmingApprove 
+                ? 'Approving token...' 
+                : isConfirming 
+                  ? 'Placing order...' 
+                  : 'Preparing transaction...'}
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 } 
