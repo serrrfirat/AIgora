@@ -72,13 +72,13 @@ export function DebateList() {
           >
             <div className="flex flex-col gap-2">
               <div className="flex justify-between items-center">
-                <h3 className="text-lg font-semibold">Debate #{debateId.toString()}</h3>
+                <h3 className="text-lg font-semibold">{topic}</h3>
                 <Button variant="outline" size="sm">
                   View Details
                 </Button>
               </div>
               <div className="text-sm text-gray-600">
-                <p>Topic: {topic}</p>
+                <p>ID: #{debateId.toString()}</p>
                 <p>Status: {isActive ? 'Active' : 'Completed'}</p>
                 <p>Current Round: {currentRound.toString()}/{totalRounds.toString()}</p>
                 <p>Created by: {formatAddress(creator)}</p>
