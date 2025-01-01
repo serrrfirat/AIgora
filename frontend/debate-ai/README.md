@@ -1,36 +1,129 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AIgora - Prediction Markets for AI Debates
 
-## Getting Started
+AIgora is a decentralized platform that combines prediction markets with AI-driven debates. The platform uses bonding curves and market mechanics to create liquid markets around debate outcomes.
 
-First, run the development server:
+## Project Structure
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+aigora/
+├── contracts/           # Smart contract implementation
+│   └── evm/            # Ethereum Virtual Machine contracts
+│       ├── src/        # Contract source files
+│       │   ├── MarketFactory.sol    # Core market contract
+│       │   ├── DebateFactory.sol    # Debate management contract
+│       │   └── MockToken.sol        # Test token contract
+│       ├── script/     # Deployment scripts
+│       └── test/       # Contract tests
+└── frontend/           # Web application
+    └── debate-ai/      # Next.js frontend
+        ├── app/        # Next.js app router
+        ├── components/ # React components
+        ├── config/     # Configuration files
+        └── lib/        # Utility functions
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Components
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Smart Contracts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The blockchain layer consists of three main contracts:
 
-## Learn More
+#### MarketFactory.sol
+- Manages prediction markets for debates
+- Implements bonding curve mechanics
+- Handles order placement and matching
+- Manages market resolution and payouts
 
-To learn more about Next.js, take a look at the following resources:
+Features:
+- Bonding curve with linear price increase
+- Order book for each outcome
+- Volume-based probability calculations
+- Token-based trading (ERC20)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+#### DebateFactory.sol
+- Manages debate creation and lifecycle
+- Handles judge assignments
+- Tracks debate rounds and timing
+- Links debates to prediction markets
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+#### MockToken.sol
+- Test ERC20 token for development
+- Implements standard token interface
+- Allows minting for testing
 
-## Deploy on Vercel
+### Frontend
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+A modern web application built with:
+- Next.js 14 with App Router
+- React for UI components
+- Wagmi for Web3 integration
+- Shadcn/ui for component library
+- TailwindCSS for styling
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Features:
+- Real-time market data display
+- Order placement interface
+- Bonding curve visualization
+- Wallet integration
+- Dynamic probability calculations
+
+## Setup
+
+### Prerequisites
+- Node.js 18+
+- PNPM package manager
+- Foundry for smart contract development
+- Ethereum wallet (MetaMask recommended)
+
+### Smart Contracts
+```bash
+cd contracts/evm
+forge install
+forge build
+forge test
+```
+
+### Frontend
+```bash
+cd frontend/debate-ai
+pnpm install
+pnpm dev
+```
+
+## Development
+
+### Contract Development
+```bash
+# Run tests
+forge test
+
+# Deploy contracts
+forge script script/Deploy.s.sol --rpc-url <RPC_URL> --broadcast
+
+# Verify contracts
+forge verify-contract <CONTRACT_ADDRESS> <CONTRACT_NAME> --chain <CHAIN_ID>
+```
+
+### Frontend Development
+```bash
+# Start development server
+pnpm dev
+
+# Build for production
+pnpm build
+
+# Run linting
+pnpm lint
+```
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+MIT License - see LICENSE file for details
