@@ -1,65 +1,76 @@
-# AIgora - Agentic Debate
+# AIgora - Prediction Markets for AI Debates
 
-AIgora is a decentralized platform that enables AI-driven debates with betting and bonding curve mechanics. The platform combines web3, agentic AI through Eliza, and a modern web interface to create an engaging debate experience.
+AIgora is a decentralized platform that combines prediction markets with AI-driven debates. The platform uses bonding curves and market mechanics to create liquid markets around debate outcomes.
 
 ## Project Structure
 
 ```
-agora/
+aigora/
 ├── contracts/           # Smart contract implementation
 │   └── evm/            # Ethereum Virtual Machine contracts
 │       ├── src/        # Contract source files
-│       │   ├── Debate.sol        # Core debate contract
-│       │   └── DebateFactory.sol # Factory for creating debates
+│       │   ├── MarketFactory.sol    # Core market contract
+│       │   ├── DebateFactory.sol    # Debate management contract
+│       │   └── MockToken.sol        # Test token contract
 │       ├── script/     # Deployment scripts
 │       └── test/       # Contract tests
-├── frontend/           # Web application
-│   ├── components/     # React components
-│   ├── pages/         # Next.js pages
-│   └── styles/        # CSS and styling
-└── debate-agent/             # eliza agent
+└── frontend/           # Web application
+    └── debate-ai/      # Next.js frontend
+        ├── app/        # Next.js app router
+        ├── components/ # React components
+        ├── config/     # Configuration files
+        └── lib/        # Utility functions
 ```
 
 ## Components
 
 ### Smart Contracts
 
-The blockchain layer is built on Ethereum and includes:
-- `Debate.sol`: Core contract managing debate mechanics, betting, and scoring
-- `DebateFactory.sol`: Factory contract for creating new debate instances
-- Features:
-  - Bonding curve mechanics for early participation incentives
-  - Judge scoring system
-  - Token-based betting
-  - Reward distribution
+The blockchain layer consists of three main contracts:
+
+#### MarketFactory.sol
+- Manages prediction markets for debates
+- Implements bonding curve mechanics
+- Handles order placement and matching
+- Manages market resolution and payouts
+
+Features:
+- Bonding curve with linear price increase
+- Order book for each outcome
+- Volume-based probability calculations
+- Token-based trading (ERC20)
+
+#### DebateFactory.sol
+- Manages debate creation and lifecycle
+- Handles judge assignments
+- Tracks debate rounds and timing
+- Links debates to prediction markets
+
+#### MockToken.sol
+- Test ERC20 token for development
+- Implements standard token interface
+- Allows minting for testing
 
 ### Frontend
 
 A modern web application built with:
-- Next.js for server-side rendering
+- Next.js 14 with App Router
 - React for UI components
-- Web3 integration for blockchain interaction
-- Features:
-  - Debate creation and participation
-  - Real-time debate viewing
-  - Betting interface
-  - User dashboard
+- Wagmi for Web3 integration
+- Shadcn/ui for component library
+- TailwindCSS for styling
 
-### AI Agent (Eliza)
-
-Currently, this is very simple and needs work on the character setup, development and deployment
-
-The AI debate system includes:
-- Eliza character creation
-- Debate participation logic
-- Scoring at the end of the debate
-
-
+Features:
+- Real-time market data display
+- Order placement interface
+- Bonding curve visualization
+- Wallet integration
+- Dynamic probability calculations
 
 ## Setup
 
 ### Prerequisites
-- Node.js 16+
+- Node.js 18+
 - PNPM package manager
 - Foundry for smart contract development
 - Ethereum wallet (MetaMask recommended)
@@ -74,47 +85,44 @@ forge test
 
 ### Frontend
 ```bash
-cd frontend
+cd frontend/debate-ai
 pnpm install
 pnpm dev
-```
-
-### Agent
-```bash
-pnpm start
 ```
 
 ## Development
 
 ### Contract Development
-- Use Foundry for contract development and testing
-- Deploy using provided scripts:
-  ```bash
-  forge script script/DeployDebate.s.sol --rpc-url <RPC_URL> --broadcast
-  ```
+```bash
+# Run tests
+forge test
+
+# Deploy contracts
+forge script script/Deploy.s.sol --rpc-url <RPC_URL> --broadcast
+
+# Verify contracts
+forge verify-contract <CONTRACT_ADDRESS> <CONTRACT_NAME> --chain <CHAIN_ID>
+```
 
 ### Frontend Development
-- Run in development mode:
-  ```bash
-  pnpm dev
-  ```
-- Build for production:
-  ```bash
-  pnpm build
-  ```
+```bash
+# Start development server
+pnpm dev
 
-### Testing
-- Smart Contracts: `forge test`
-- Frontend: `pnpm test`
-- Agent: `pnpm test`
+# Build for production
+pnpm build
+
+# Run linting
+pnpm lint
+```
 
 ## Contributing
 
 1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a new Pull Request
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ## License
 
