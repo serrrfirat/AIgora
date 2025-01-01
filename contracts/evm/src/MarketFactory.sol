@@ -373,4 +373,100 @@ contract MarketFactory is ReentrancyGuard, OwnableRoles {
         require(outcomeIndex < market.outcomes.length, "Invalid outcome");
         return market.positions[user].shares[outcomeIndex];
     }
+
+    function outcomeVolumes(uint256 marketId, uint256 outcomeIndex) external view returns (uint256) {
+        return markets[marketId].outcomeVolumes[outcomeIndex];
+    }
+
+    // New read functions for DebateView
+    function getBondingCurveDetails(uint256 marketId) external view returns (
+        uint256 target,
+        uint256 current,
+        uint256 basePrice,
+        uint256 currentPrice,
+        bool isFulfilled,
+        uint256 endTime
+    ) {
+        BondingCurve storage curve = markets[marketId].bondingCurve;
+        return (
+            curve.target,
+            curve.current,
+            curve.basePrice,
+            curve.currentPrice,
+            curve.isFulfilled,
+            curve.endTime
+        );
+    }
+
+    function getMarketPrices(uint256 marketId) external view returns (uint256[] memory) {
+        Market storage market = markets[marketId];
+        uint256[] memory prices = new uint256[](market.outcomes.length);
+        
+        for (uint256 i = 0; i < market.outcomes.length; i++) {
+            Order[] storage orderBook = market.orderBooks[i];
+            if (orderBook.length > 0) {
+                prices[i] = orderBook[0].price;
+            } else {
+                prices[i] = market.lastTradedPrices[i];
+            }
+        }
+        
+        return prices;
+    }
+
+    function getMarketVolumes(uint256 marketId) external view returns (uint256[] memory) {
+        Market storage market = markets[marketId];
+        uint256[] memory volumes = new uint256[](market.outcomes.length);
+        
+        for (uint256 i = 0; i < market.outcomes.length; i++) {
+            volumes[i] = market.outcomeVolumes[i];
+        }
+        
+        return volumes;
+    }
+
+    function getUserPositions(uint256 marketId, address user) external view returns (uint256[] memory) {
+        Market storage market = markets[marketId];
+        uint256[] memory positions = new uint256[](market.outcomes.length);
+        
+        for (uint256 i = 0; i < market.outcomes.length; i++) {
+            positions[i] = market.positions[user].shares[i];
+        }
+        
+        return positions;
+    }
+
+    function getOrderBookSummary(uint256 marketId, uint256 outcomeIndex) external view returns (
+        uint256[] memory prices,
+        uint256[] memory amounts,
+        address[] memory owners
+    ) {
+        Market storage market = markets[marketId];
+        Order[] storage orderBook = market.orderBooks[outcomeIndex];
+        
+        uint256 length = orderBook.length;
+        prices = new uint256[](length);
+        amounts = new uint256[](length);
+        owners = new address[](length);
+        
+        for (uint256 i = 0; i < length; i++) {
+            Order storage order = orderBook[i];
+            prices[i] = order.price;
+            amounts[i] = order.amount;
+            owners[i] = order.owner;
+        }
+        
+        return (prices, amounts, owners);
+    }
+
+    function getTotalVolume(uint256 marketId) external view returns (uint256) {
+        Market storage market = markets[marketId];
+        uint256 total = 0;
+        
+        for (uint256 i = 0; i < market.outcomes.length; i++) {
+            total += market.outcomeVolumes[i];
+        }
+        
+        return total;
+    }
 } 

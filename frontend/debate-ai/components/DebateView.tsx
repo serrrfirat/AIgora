@@ -92,13 +92,58 @@ export function DebateView({ debateId }: DebateViewProps) {
     args: marketId ? [marketId] : undefined,
   }) as { data: Outcome[] | undefined };
 
-  // Get current prices
-  const { data: currentPrices } = useReadContract({
+  // Get current prices for all outcomes
+  const { data: outcomePrices } = useReadContract({
     address: MARKET_FACTORY_ADDRESS,
     abi: MARKET_FACTORY_ABI,
-    functionName: 'getCurrentPrice',
-    args: marketId && outcomes ? [marketId, 0n] : undefined,
+    functionName: 'getMarketPrices',
+    args: marketId ? [marketId] : undefined,
   });
+
+  // Get volumes for all outcomes
+  const { data: outcomeVolumes } = useReadContract({
+    address: MARKET_FACTORY_ADDRESS,
+    abi: MARKET_FACTORY_ABI,
+    functionName: 'getMarketVolumes',
+    args: marketId ? [marketId] : undefined,
+  });
+
+  // Get total volume
+  const { data: totalVolume } = useReadContract({
+    address: MARKET_FACTORY_ADDRESS,
+    abi: MARKET_FACTORY_ABI,
+    functionName: 'getTotalVolume',
+    args: marketId ? [marketId] : undefined,
+  });
+
+  // Get bonding curve details
+  const { data: bondingCurveDetails } = useReadContract({
+    address: MARKET_FACTORY_ADDRESS,
+    abi: MARKET_FACTORY_ABI,
+    functionName: 'getBondingCurveDetails',
+    args: marketId ? [marketId] : undefined,
+  }) as { data: [bigint, bigint, bigint, bigint, boolean, bigint] | undefined };
+
+  // Get user positions if connected
+  const { data: userPositions } = useReadContract({
+    address: MARKET_FACTORY_ADDRESS,
+    abi: MARKET_FACTORY_ABI,
+    functionName: 'getUserPositions',
+    args: marketId && address ? [marketId, address] : undefined,
+  });
+
+  // Calculate total volume in ETH
+  const formattedTotalVolume = totalVolume ? formatEther(totalVolume) : '0';
+
+  // Format bonding curve data
+  const bondingCurve = bondingCurveDetails ? {
+    target: bondingCurveDetails[0],
+    current: bondingCurveDetails[1],
+    basePrice: bondingCurveDetails[2],
+    currentPrice: bondingCurveDetails[3],
+    isFulfilled: bondingCurveDetails[4],
+    endTime: bondingCurveDetails[5]
+  } : undefined;
 
   const { 
     data: approveHash,
@@ -188,8 +233,8 @@ export function DebateView({ debateId }: DebateViewProps) {
   
 
   const handlePlaceLimitOrder = async (outcomeIndex: bigint, isLong: boolean) => {
-    if (!marketId || !marketDetails || !publicClient) {
-      console.error('Market data not loaded or client not ready', { marketId, marketDetails });
+    if (!marketId || !bondingCurve) {
+      console.error('Market data not loaded');
       return;
     }
 
@@ -207,10 +252,6 @@ export function DebateView({ debateId }: DebateViewProps) {
       }
 
       // Then place order
-      console.log('Market details:', marketDetails);
-      const bondingCurve = marketDetails[4]; // This is the bonding curve object
-      console.log('Bonding curve:', bondingCurve);
-      
       const price = isLong ? bondingCurve.basePrice : (10000n - bondingCurve.basePrice);
       console.log('Base price:', bondingCurve.basePrice.toString());
       console.log('Calculated price:', price.toString());
@@ -222,22 +263,13 @@ export function DebateView({ debateId }: DebateViewProps) {
         amountInWei: amountInWei.toString()
       });
 
-      const orderResult = await placeLimitOrder({
+      await placeLimitOrder({
         address: MARKET_FACTORY_ADDRESS as `0x${string}`,
         abi: MARKET_FACTORY_ABI,
         functionName: 'placeLimitOrder',
         args: [marketId, outcomeIndex, price, amountInWei]
       });
 
-      if (orderResult) {
-        console.log('Order submitted, waiting for confirmation...');
-        await waitForTransactionReceipt(publicClient as any, {
-          hash: orderResult,
-        });
-        console.log('Order confirmed!');
-      } else {
-        console.error('No transaction hash received from order placement');
-      }
     } catch (error) {
       console.error('Error placing order:', error);
     } finally {
@@ -249,8 +281,8 @@ export function DebateView({ debateId }: DebateViewProps) {
     const numValue = parseFloat(value) || 0;
     setAmount(value);
     // Calculate potential return based on current price
-    if (selectedOutcome) {
-      const price = Number(currentPrices || 0n) / 100;
+    if (selectedOutcome && outcomePrices) {
+      const price = Number(outcomePrices[Number(selectedOutcome.index)]) / 100;
       const return_value = orderType === 'buy' 
         ? numValue * (100 / price - 1)
         : numValue * (100 / (100 - price) - 1);
@@ -264,7 +296,9 @@ export function DebateView({ debateId }: DebateViewProps) {
     handleAmountChange(newAmount.toString());
   };
 
-  if (!debateDetails || !marketDetails || !outcomes || currentPrices === undefined) return <div>Loading market details...</div>;
+  if (!debateDetails || !marketDetails || !outcomes || !outcomePrices || !bondingCurve) {
+    return <div>Loading market details...</div>;
+  }
   const [
     topic,
     startTime,
@@ -289,7 +323,6 @@ export function DebateView({ debateId }: DebateViewProps) {
     bondingCurveData,
     totalBondingAmount
   ] = marketDetails;
-
 
   // Access bonding curve data directly as an object
   const {
@@ -391,18 +424,28 @@ export function DebateView({ debateId }: DebateViewProps) {
               <div className="text-sm text-gray-400">% CHANCE ↻</div>
             </div>
             <div className="space-y-4">
-              {outcomes?.map((outcome, i) => {
-                const currentPrice = Number(currentPrices || 0n) / 100;
-                const volume = formatEther(totalBondingAmount);
+              {outcomes?.map((outcome, index) => {
+                const currentPrice = Number(outcomePrices[index]) / 100;
+                const volume = outcomeVolumes ? formatEther(outcomeVolumes[index]) : '0';
+                const volumePercentage = formattedTotalVolume !== '0'
+                  ? ((Number(volume) / Number(formattedTotalVolume)) * 100).toFixed(1)
+                  : '0';
                 
                 return (
-                  <div key={i} className="border-t border-gray-800 pt-4">
+                  <div key={outcome.index.toString()} className="border-t border-gray-800 pt-4">
                     <div className="flex justify-between items-start mb-2">
                       <div>
                         <div className="font-medium">{outcome.name}</div>
-                        <div className="text-sm text-gray-400">${volume} Vol.</div>
+                        <div className="text-sm text-gray-400">
+                          ${volume} Vol. ({volumePercentage}%)
+                        </div>
                       </div>
-                      <div className="text-xl font-medium">{currentPrice}%</div>
+                      <div className="text-right">
+                        <div className="text-xl font-medium">{currentPrice}%</div>
+                        <div className="text-sm text-gray-400">
+                          Implied Probability
+                        </div>
+                      </div>
                     </div>
                     <div className="flex gap-2">
                       <Button 
@@ -500,7 +543,9 @@ export function DebateView({ debateId }: DebateViewProps) {
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Avg price</span>
-                  <span>{selectedOutcome ? `${(Number(currentPrices || 0n) / 100).toFixed(1)}¢` : '-'}</span>
+                  <span>{selectedOutcome && outcomePrices 
+                    ? `${(Number(outcomePrices[Number(selectedOutcome.index)]) / 100).toFixed(1)}¢` 
+                    : '-'}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Shares</span>
