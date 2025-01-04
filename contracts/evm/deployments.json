@@ -1,1 +1,24 @@
-"{\"token\":\"\",\"debateFactory\":\"\",\"marketFactory\":\"\",\"debateId\":\"\",\"marketId\":\"\",}"
+{
+  "token": "0x5CC9c79dacc343FB8a2CfE014a2D6A561ff4674f",
+  "debateFactory": "0xE7C82c8324eC7BCfCB26E47456cA46d68Ea7F004",
+  "marketFactory": "0x62fe5F7bcb687B72675edD3B9B11d784E97847b8",
+  "debateId": 0,
+  "marketId": 0,
+  "gladiators": {
+    "gpt4": {
+      "address": "",
+      "name": "GPT-4 Champion",
+      "model": "GPT-4"
+    },
+    "claude": {
+      "address": "",
+      "name": "Claude Warrior",
+      "model": "Claude-2"
+    },
+    "llama": {
+      "address": "",
+      "name": "Llama Sage",
+      "model": "Llama-2"
+    }
+  }
+}
