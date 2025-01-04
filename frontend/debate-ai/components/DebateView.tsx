@@ -102,6 +102,21 @@ type LeaderboardInfo = [
   bigint[]     // gladiatorIndexes
 ];
 
+type DebateDetails = [
+  topic: string,     // topic
+  startTime: bigint,     // startTime
+  duration: bigint,     // duration
+  debateEndTime: bigint,     // debateEndTime
+  currentRound: bigint,     // currentRound
+  totalRounds: bigint,     // totalRounds
+  isActive: boolean,    // isActive
+  creator: string,     // creator
+  market: string,     // market
+  judges: string[],    // judges
+  hasOutcome: boolean,    // hasOutcome
+  finalOutcome: bigint      // finalOutcome
+];
+
 // Type for arrays that will be indexed
 type GladiatorPrices = { [index: string]: bigint };
 type GladiatorVolumes = { [index: string]: bigint };
@@ -173,6 +188,14 @@ export function DebateView({ debateId }: DebateViewProps) {
       [cardName]: !prev[cardName]
     }));
   };
+
+  /// Get Debate Details
+  const { data: debateDetails, refetch: refetchDebateDetails } = useReadContract({
+    address: DEBATE_FACTORY_ADDRESS,
+    abi: DEBATE_FACTORY_ABI,
+    functionName: 'getDebateDetails',
+    args: [BigInt(debateId)],
+  }) as { data: DebateDetails | undefined, refetch: () => void };
 
   // Get market ID from debate ID
   const { data: marketId, refetch: refetchMarketId } = useReadContract({
@@ -254,6 +277,24 @@ export function DebateView({ debateId }: DebateViewProps) {
     args: marketId && address ? [marketId, address] : undefined,
   }) as { data: bigint[] | undefined };
 
+
+  // Add allowance check
+  const { data: currentAllowance } = useReadContract({
+    address: marketDetails?.[0] as `0x${string}`,
+    abi: [{
+      name: 'allowance',
+      type: 'function',
+      stateMutability: 'view',
+      inputs: [
+        { name: 'owner', type: 'address' },
+        { name: 'spender', type: 'address' }
+      ],
+      outputs: [{ type: 'uint256' }]
+    }],
+    functionName: 'allowance',
+    args: address && marketDetails ? [address, MARKET_FACTORY_ADDRESS] : undefined,
+  });
+
   // Function to refetch all data
   const refetchAllData = async () => {
     await Promise.all([
@@ -265,24 +306,37 @@ export function DebateView({ debateId }: DebateViewProps) {
       refetchPrices(),
       refetchVolumes(),
       refetchTotalVolume(),
-      refetchBondingCurve()
+      refetchBondingCurve(),
+      refetchDebateDetails()
     ]);
   };
 
+  // Extract debate details
+  const [
+    topic,
+    startTime,
+    duration,
+    debateEndTime,
+    currentRound,
+    totalRounds,
+    isActive,
+    creator,
+    market,
+    judges,
+    hasOutcome,
+    finalOutcome
+  ] = debateDetails || [];
+
   // Loading check
-  if (!marketDetails || !gladiators || !gladiatorPrices || !bondingCurveDetails) {
+  if (!marketDetails || !gladiators || !gladiatorPrices || !bondingCurveDetails || !debateDetails) {
     return <div>Loading market details...</div>;
   }
 
-  // Extract market details
-  const [
-    token,
-    _debateId,
-    resolved,
-    winningGladiator,
-    bondingCurveData,
-    totalBondingAmount
-  ] = marketDetails;
+  // Format total volume
+  const totalVolumeFormatted = formatEther(totalVolume || 0n);
+
+  // Calculate end date
+  const endDate = debateEndTime ? new Date(Number(debateEndTime) * 1000) : new Date();
 
   // Format bonding curve data
   const bondingCurve = {
@@ -302,22 +356,7 @@ export function DebateView({ debateId }: DebateViewProps) {
   const daysRemaining = Math.floor(timeRemaining / (24 * 60 * 60));
   const hoursRemaining = Math.floor((timeRemaining % (24 * 60 * 60)) / 3600);
 
-  // Add allowance check
-  const { data: currentAllowance } = useReadContract({
-    address: marketDetails?.[0] as `0x${string}`,
-    abi: [{
-      name: 'allowance',
-      type: 'function',
-      stateMutability: 'view',
-      inputs: [
-        { name: 'owner', type: 'address' },
-        { name: 'spender', type: 'address' }
-      ],
-      outputs: [{ type: 'uint256' }]
-    }],
-    functionName: 'allowance',
-    args: address && marketDetails ? [address, MARKET_FACTORY_ADDRESS] : undefined,
-  });
+
 
   const handleApproveToken = async (amountInWei: bigint) => {
     if (!marketDetails || !address) return false;
@@ -435,6 +474,7 @@ export function DebateView({ debateId }: DebateViewProps) {
   console.log("gladiators", gladiators);
   console.log("gladiatorPrices", gladiatorPrices);
   console.log("bondingCurveDetails", bondingCurveDetails);
+  console.log("debateDetails", debateDetails);
 
   return (
     <div className="container mx-auto p-4 flex gap-4">
@@ -536,7 +576,7 @@ export function DebateView({ debateId }: DebateViewProps) {
             <div className="text-sm text-gray-400">Bonding Curve Progress</div>
             <div className="flex items-center gap-2">
               <div className="text-sm font-medium">
-                {formatEther(current)}/${formatEther(target)}
+                {formatEther(bondingCurve?.current || 0n)}/${formatEther(bondingCurve?.target || 0n)}
               </div>
               <ChevronDown className={`w-5 h-5 transition-transform ${expandedCards.bondingCurve ? 'rotate-0' : '-rotate-90'}`} />
             </div>
@@ -547,21 +587,21 @@ export function DebateView({ debateId }: DebateViewProps) {
                 <div className="flex justify-between items-center mb-2">
                   <div className="text-sm text-gray-400">Bonding Curve Progress</div>
                   <div className="text-sm font-medium">
-                    {formatEther(current)}/{formatEther(target)}
+                    {formatEther(bondingCurve?.current || 0n)}/{formatEther(bondingCurve?.target || 0n)}
                   </div>
                 </div>
                 <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
                   <div 
                     className="h-full bg-blue-500 rounded-full transition-all duration-500"
                     style={{ 
-                      width: `${Math.min(100, (Number(current) * 100) / Number(target))}%`,
-                      backgroundColor: isFulfilled ? '#3FB950' : '#2F81F7'
+                      width: `${Math.min(100, (Number(bondingCurve?.current || 0n) * 100) / Number(bondingCurve?.target || 0n))}%`,
+                      backgroundColor: bondingCurve?.isFulfilled ? '#3FB950' : '#2F81F7'
                     }}
                   />
                 </div>
                 <div className="flex justify-between text-xs text-gray-400">
-                  <div>Current: ${formatEther(current)}</div>
-                  <div>Target: ${formatEther(target)}</div>
+                  <div>Current: ${formatEther(bondingCurve?.current || 0n)}</div>
+                  <div>Target: ${formatEther(bondingCurve?.target || 0n)}</div>
                 </div>
               </div>
             </CardContent>
@@ -582,8 +622,8 @@ export function DebateView({ debateId }: DebateViewProps) {
               <div className="space-y-4">
                 <div className="flex justify-between items-start">
                   <div>
-                    <h2 className="text-xl font-bold mb-2">{topic}</h2>
-                    <div className="text-sm text-gray-400">Created by {formatAddress(creator)}</div>
+                    <h2 className="text-xl font-bold mb-2">{topic || 'Loading...'}</h2>
+                    <div className="text-sm text-gray-400">Created by {formatAddress(creator || '')}</div>
                   </div>
                   <div className="text-right">
                     <div className="text-sm font-medium">
@@ -603,11 +643,11 @@ export function DebateView({ debateId }: DebateViewProps) {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-gray-800">
                   <div>
                     <div className="text-sm text-gray-400">Total Volume</div>
-                    <div className="font-medium">${formatEther(totalBondingAmount)}</div>
+                    <div className="font-medium">${totalVolumeFormatted}</div>
                   </div>
                   <div>
                     <div className="text-sm text-gray-400">Round</div>
-                    <div className="font-medium">{currentRound.toString()}/{totalRounds.toString()}</div>
+                    <div className="font-medium">{currentRound?.toString() || '0'}/{totalRounds?.toString() || '0'}</div>
                   </div>
                   <div>
                     <div className="text-sm text-gray-400">End Date</div>
@@ -615,7 +655,7 @@ export function DebateView({ debateId }: DebateViewProps) {
                   </div>
                   <div>
                     <div className="text-sm text-gray-400">Judges</div>
-                    <div className="font-medium">{judges.length}</div>
+                    <div className="font-medium">{judges?.length || 0}</div>
                   </div>
                 </div>
               </div>
@@ -643,15 +683,16 @@ export function DebateView({ debateId }: DebateViewProps) {
               </div>
               <div className="space-y-4">
                 {gladiators?.map((gladiator, index) => {
-                  const currentPrice = Number(gladiatorPrices?.[index] || 0) / BASIS_POINTS;
+                  const currentPrice = Number(gladiatorPrices?.[index] || 0n) / Number(BASIS_POINTS);
                   const volume = gladiatorVolumes ? formatEther(gladiatorVolumes[index]) : '0';
-                  const volumePercentage = formattedTotalVolume !== '0'
-                    ? ((Number(volume) / Number(formattedTotalVolume)) * 100).toFixed(1)
+                  const totalVolumeFormatted = formatEther(totalVolume || 0n);
+                  const volumePercentage = totalVolumeFormatted !== '0'
+                    ? ((Number(volume) / Number(totalVolumeFormatted)) * 100).toFixed(1)
                     : '0';
                   
                   // Calculate implied probability based on volume
-                  const impliedProbability = formattedTotalVolume !== '0'
-                    ? ((Number(volume) / Number(formattedTotalVolume)) * 100).toFixed(1)
+                  const impliedProbability = totalVolumeFormatted !== '0'
+                    ? ((Number(volume) / Number(totalVolumeFormatted)) * 100).toFixed(1)
                     : currentPrice.toFixed(1);
                   
                   // Calculate prices based on probability
@@ -781,12 +822,12 @@ export function DebateView({ debateId }: DebateViewProps) {
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Avg price</span>
-                  <span>{selectedGladiator && gladiatorPrices && gladiatorVolumes && formattedTotalVolume ? 
+                  <span>{selectedGladiator && gladiatorPrices && gladiatorVolumes && totalVolumeFormatted ? 
                     (() => {
                       const volume = formatEther(gladiatorVolumes[Number(selectedGladiator.index)]);
-                      const impliedProbability = formattedTotalVolume !== '0'
-                        ? (Number(volume) / Number(formattedTotalVolume))
-                        : Number(gladiatorPrices[Number(selectedGladiator.index)]) / BASIS_POINTS;
+                      const impliedProbability = totalVolumeFormatted !== '0' 
+                        ? (Number(volume) / Number(totalVolumeFormatted))
+                        : Number(gladiatorPrices[Number(selectedGladiator.index)]) / Number(BASIS_POINTS);
                       return orderType === 'sell'
                         ? `${impliedProbability.toFixed(2)}¢`
                         : `${(1 - impliedProbability).toFixed(2)}¢`;
@@ -795,12 +836,12 @@ export function DebateView({ debateId }: DebateViewProps) {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Shares</span>
-                  <span>{selectedGladiator && gladiatorPrices && gladiatorVolumes && formattedTotalVolume && parseFloat(amount) ? 
+                  <span>{selectedGladiator && gladiatorPrices && gladiatorVolumes && totalVolumeFormatted && parseFloat(amount) ? 
                     (() => {
                       const volume = formatEther(gladiatorVolumes[Number(selectedGladiator.index)]);
-                      const impliedProbability = formattedTotalVolume !== '0'
-                        ? (Number(volume) / Number(formattedTotalVolume))
-                        : Number(gladiatorPrices[Number(selectedGladiator.index)]) / BASIS_POINTS;
+                      const impliedProbability = totalVolumeFormatted !== '0'
+                        ? (Number(volume) / Number(totalVolumeFormatted))
+                        : Number(gladiatorPrices[Number(selectedGladiator.index)]) / Number(BASIS_POINTS);
                       const avgPrice = orderType === 'sell' ? impliedProbability : (1 - impliedProbability);
                       return (parseFloat(amount) / avgPrice).toFixed(2);
                     })()
