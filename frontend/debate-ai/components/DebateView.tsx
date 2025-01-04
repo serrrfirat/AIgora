@@ -561,8 +561,8 @@ export function DebateView({ debateId }: DebateViewProps) {
         {bondingCurve?.isFulfilled && (
           <BribeSubmission
             marketId={marketId}
-            roundId={currentRound}
-            outcomes={outcomes || []}
+            roundId={roundIndex}
+            gladiators={gladiators}
             onBribeSubmitted={refetchAllData}
           />
         )}

@@ -20,19 +20,19 @@ type BribesResponse = [string[], bigint[], string[], bigint[], bigint[]];
 interface BribeSubmissionProps {
   marketId: bigint;
   roundId: bigint;
-  outcomes: { name: string; index: bigint }[];
+  gladiators: { name: string; index: bigint }[];
   onBribeSubmitted?: () => void;
 }
 
-export function BribeSubmission({ marketId, roundId, outcomes, onBribeSubmitted }: BribeSubmissionProps) {
+export function BribeSubmission({ marketId, roundId, gladiators, onBribeSubmitted }: BribeSubmissionProps) {
   const [information, setInformation] = useState('');
-  const [selectedOutcome, setSelectedOutcome] = useState<bigint | null>(null);
+  const [selectedGladiator, setSelectedGladiator] = useState<bigint | null>(null);
   const { isConnected } = useAccount();
 
   const { writeContract: submitBribe, isPending } = useWriteContract();
 
   // Get existing bribes for this round with proper typing
-  const { data: bribesData } = useReadContract<typeof MARKET_FACTORY_ABI, 'getBribesForRound'>({
+  const { data: bribesData } = useReadContract({
     address: MARKET_FACTORY_ADDRESS,
     abi: MARKET_FACTORY_ABI,
     functionName: 'getBribesForRound',
@@ -42,19 +42,19 @@ export function BribeSubmission({ marketId, roundId, outcomes, onBribeSubmitted 
   const typedBribesData = bribesData as BribesResponse | undefined;
 
   const handleSubmit = async () => {
-    if (!selectedOutcome || !information.trim()) return;
+    if (!selectedGladiator || !information.trim()) return;
 
     try {
-      await submitBribe({
+      submitBribe({
         address: MARKET_FACTORY_ADDRESS,
         abi: MARKET_FACTORY_ABI,
         functionName: 'submitBribe',
-        args: [marketId, roundId, information, selectedOutcome],
+        args: [marketId, roundId, information, selectedGladiator],
       });
 
       // Clear form after successful submission
       setInformation('');
-      setSelectedOutcome(null);
+      setSelectedGladiator(null);
       
       // Notify parent component
       if (onBribeSubmitted) {
@@ -72,16 +72,16 @@ export function BribeSubmission({ marketId, roundId, outcomes, onBribeSubmitted 
         
         <div className="space-y-4">
           <div>
-            <label className="text-sm text-gray-400 mb-2 block">Select Outcome</label>
+            <label className="text-sm text-gray-400 mb-2 block">Select Gladiator</label>
             <div className="grid grid-cols-2 gap-2">
-              {outcomes.map((outcome) => (
+              {gladiators.map((gladiator) => (
                 <Button
-                  key={outcome.index.toString()}
-                  variant={selectedOutcome === outcome.index ? "default" : "outline"}
-                  onClick={() => setSelectedOutcome(outcome.index)}
+                  key={gladiator.index.toString()}
+                  variant={selectedGladiator === gladiator.index ? "default" : "outline"}
+                  onClick={() => setSelectedGladiator(gladiator.index)}
                   className="w-full"
                 >
-                  {outcome.name}
+                  {gladiator.name}
                 </Button>
               ))}
             </div>
@@ -103,7 +103,7 @@ export function BribeSubmission({ marketId, roundId, outcomes, onBribeSubmitted 
 
           <Button
             className="w-full"
-            disabled={!isConnected || !selectedOutcome || !information.trim() || isPending}
+            disabled={!isConnected || !selectedGladiator || !information.trim() || isPending}
             onClick={handleSubmit}
           >
             {!isConnected 
@@ -128,7 +128,7 @@ export function BribeSubmission({ marketId, roundId, outcomes, onBribeSubmitted 
                 </div>
                 <p className="text-sm">{typedBribesData[2][index]}</p>
                 <div className="text-xs text-gray-400 mt-1">
-                  Supporting: {outcomes.find(o => o.index === typedBribesData[4][index])?.name}
+                  Supporting: {gladiators.find(g => g.index === typedBribesData[4][index])?.name}
                 </div>
               </div>
             ))}
