@@ -3,6 +3,7 @@
 import { Suspense } from 'react';
 import { CreateDebate } from '@/components/CreateDebate';
 import { DebateList } from '@/components/DebateList';
+import { GladiatorList } from '@/components/GladiatorList';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
@@ -17,14 +18,21 @@ export default function Home() {
 
           <Card className="w-full">
             <Tabs defaultValue="debates" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="debates">Active Debates</TabsTrigger>
+                <TabsTrigger value="gladiators">Gladiators</TabsTrigger>
                 <TabsTrigger value="create">Create Debate</TabsTrigger>
               </TabsList>
 
               <TabsContent value="debates">
                 <Suspense fallback={<div className="p-4 text-center">Loading debates...</div>}>
                   <DebateList />
+                </Suspense>
+              </TabsContent>
+
+              <TabsContent value="gladiators">
+                <Suspense fallback={<div className="p-4 text-center">Loading gladiators...</div>}>
+                  <GladiatorList />
                 </Suspense>
               </TabsContent>
 

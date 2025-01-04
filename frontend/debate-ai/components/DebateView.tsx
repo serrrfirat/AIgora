@@ -3,7 +3,7 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DEBATE_FACTORY_ADDRESS, DEBATE_FACTORY_ABI, MARKET_FACTORY_ADDRESS, MARKET_FACTORY_ABI } from '@/config/contracts';
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useClient, useRefetchContext } from 'wagmi';
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useClient } from 'wagmi';
 import { formatEther, formatAddress } from '@/lib/utils';
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -15,42 +15,97 @@ import { ChevronDown } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { BribeSubmission } from './BribeSubmission';
 
-type DebateDetails = [
-  string,      // topic
-  bigint,      // startTime
-  bigint,      // duration
-  bigint,      // debateEndTime
-  bigint,      // currentRound
-  bigint,      // totalRounds
-  boolean,     // isActive
-  string,      // creator
-  string,      // market
-  string[],    // judges
-  boolean,     // hasOutcome
-  bigint       // finalOutcome
+// Constants from the contract
+const BASIS_POINTS = 10000n;
+const MIN_PRICE = 1n; // $0.01 in basis points
+const MAX_PRICE = 9900n; // $0.99 in basis points
+const MIN_ORDER_SIZE = BigInt(10**18); // 1 full token
+
+// Type definitions matching MarketFactory.sol structs
+type BondingCurveStruct = {
+  target: bigint;          // Target amount to reach
+  current: bigint;         // Current amount raised
+  basePrice: bigint;       // Starting price
+  currentPrice: bigint;    // Current price
+  isFulfilled: boolean;    // Whether target is reached
+  endTime: bigint;         // When bonding period ends
+};
+
+// Type for how bonding curve is returned from contract
+type BondingCurve = [
+  bigint,    // target
+  bigint,    // current
+  bigint,    // basePrice
+  bigint,    // currentPrice
+  boolean,   // isFulfilled
+  bigint     // endTime
 ];
 
+type Gladiator = {
+  aiAddress: string;      // Address of the AI agent
+  name: string;           // Name of the gladiator
+  index: bigint;         // Index in gladiators array
+  isActive: boolean;     // Whether still in competition
+  publicKey: string;     // Public key for encrypted bribes
+};
+
+type JudgeVerdict = {
+  scores: bigint[];      // Scores for each gladiator
+  timestamp: bigint;     // When verdict was given
+};
+
+type Round = {
+  startTime: bigint;
+  endTime: bigint;
+  isComplete: boolean;
+  verdict: JudgeVerdict;
+};
+
+type Order = {
+  price: bigint;        // Price in basis points (100 = 1%)
+  amount: bigint;       // Amount of shares
+  outcomeIndex: bigint; // Which outcome this order is for
+  owner: string;        // Order creator
+};
+
+type Position = {
+  shares: { [gladiatorIndex: string]: bigint }; // gladiatorIndex => number of shares
+};
+
+type Bribe = {
+  briber: string;
+  amount: bigint;
+  information: string;
+  timestamp: bigint;
+  outcomeIndex: bigint;
+};
+
+// Return types for contract read functions
 type MarketDetails = [
   string,      // token
   bigint,      // debateId
   boolean,     // resolved
-  bigint,      // winningOutcome
-  [            // bondingCurve
-    bigint,    // target
-    bigint,    // current
-    bigint,    // basePrice
-    bigint,    // currentPrice
-    boolean,   // isFulfilled
-    bigint     // endTime
-  ],
+  bigint,      // winningGladiator
+  BondingCurve,// bondingCurve
   bigint       // totalBondingAmount
 ];
 
-type Outcome = {
-  name: string;
-  index: bigint;
-  isValid: boolean;
-};
+type RoundInfo = [
+  bigint,      // roundIndex
+  bigint,      // startTime
+  bigint,      // endTime
+  boolean      // isComplete
+];
+
+type LeaderboardInfo = [
+  bigint[],    // totalScores
+  bigint[]     // gladiatorIndexes
+];
+
+// Type for arrays that will be indexed
+type GladiatorPrices = { [index: string]: bigint };
+type GladiatorVolumes = { [index: string]: bigint };
+type UserPositions = { [index: string]: bigint };
 
 interface DebateViewProps {
   debateId: number;
@@ -58,121 +113,17 @@ interface DebateViewProps {
 
 export function DebateView({ debateId }: DebateViewProps) {
   const { isConnected, address } = useAccount();
+  const router = useRouter();
+  const publicClient = useClient({ config });
+
+  // Component state
   const [pendingTx, setPendingTx] = useState(false);
   const [orderType, setOrderType] = useState<'buy' | 'sell'>('buy');
-  const [selectedOutcome, setSelectedOutcome] = useState<Outcome | null>(null);
+  const [selectedGladiator, setSelectedGladiator] = useState<Gladiator | null>(null);
   const [amount, setAmount] = useState<string>('0');
   const [potentialReturn, setPotentialReturn] = useState<string>('0.00');
 
-  // Add state for tracking expanded cards
-  const [expandedCards, setExpandedCards] = useState({
-    aiDiscussion: true,
-    bondingCurve: true,
-    debateInfo: true,
-    outcomes: true
-  });
-
-  const router = useRouter();
-
-  const toggleCard = (cardName: keyof typeof expandedCards) => {
-    setExpandedCards(prev => ({
-      ...prev,
-      [cardName]: !prev[cardName]
-    }));
-  };
-
-  // Get debate details
-  const { data: debateDetails } = useReadContract({
-    address: DEBATE_FACTORY_ADDRESS,
-    abi: DEBATE_FACTORY_ABI,
-    functionName: 'getDebateDetails',
-    args: [BigInt(debateId)],
-  }) as { data: DebateDetails | undefined };
-
-  // Get all the contract reads with refetch functions
-  const { data: marketId, refetch: refetchMarketId } = useReadContract({
-    address: MARKET_FACTORY_ADDRESS,
-    abi: MARKET_FACTORY_ABI,
-    functionName: 'debateIdToMarketId',
-    args: [BigInt(debateId)],
-  });
-
-  const { data: marketDetails, refetch: refetchMarketDetails } = useReadContract({
-    address: MARKET_FACTORY_ADDRESS,
-    abi: MARKET_FACTORY_ABI,
-    functionName: 'getMarketDetails',
-    args: marketId ? [marketId] : undefined,
-  }) as { data: MarketDetails | undefined, refetch: () => void };
-
-  const { data: outcomes, refetch: refetchOutcomes } = useReadContract({
-    address: MARKET_FACTORY_ADDRESS,
-    abi: MARKET_FACTORY_ABI,
-    functionName: 'getOutcomes',
-    args: marketId ? [marketId] : undefined,
-  }) as { data: Outcome[] | undefined, refetch: () => void };
-
-  const { data: outcomePrices, refetch: refetchPrices } = useReadContract({
-    address: MARKET_FACTORY_ADDRESS,
-    abi: MARKET_FACTORY_ABI,
-    functionName: 'getMarketPrices',
-    args: marketId ? [marketId] : undefined,
-  });
-
-  const { data: outcomeVolumes, refetch: refetchVolumes } = useReadContract({
-    address: MARKET_FACTORY_ADDRESS,
-    abi: MARKET_FACTORY_ABI,
-    functionName: 'getMarketVolumes',
-    args: marketId ? [marketId] : undefined,
-  });
-
-  const { data: totalVolume, refetch: refetchTotalVolume } = useReadContract({
-    address: MARKET_FACTORY_ADDRESS,
-    abi: MARKET_FACTORY_ABI,
-    functionName: 'getTotalVolume',
-    args: marketId ? [marketId] : undefined,
-  });
-
-  const { data: bondingCurveDetails, refetch: refetchBondingCurve } = useReadContract({
-    address: MARKET_FACTORY_ADDRESS,
-    abi: MARKET_FACTORY_ABI,
-    functionName: 'getBondingCurveDetails',
-    args: marketId ? [marketId] : undefined,
-  }) as { data: [bigint, bigint, bigint, bigint, boolean, bigint] | undefined, refetch: () => void };
-
-  // Function to refetch all data
-  const refetchAllData = async () => {
-    await Promise.all([
-      refetchMarketId(),
-      refetchMarketDetails(),
-      refetchOutcomes(),
-      refetchPrices(),
-      refetchVolumes(),
-      refetchTotalVolume(),
-      refetchBondingCurve()
-    ]);
-  };
-
-  // Get user positions if connected
-  const { data: userPositions } = useReadContract({
-    address: MARKET_FACTORY_ADDRESS,
-    abi: MARKET_FACTORY_ABI,
-    functionName: 'getUserPositions',
-    args: marketId && address ? [marketId, address] : undefined,
-  });
-
-  // Calculate total volume in ETH
-  const formattedTotalVolume = totalVolume ? formatEther(totalVolume) : '0';
-
-  // Format bonding curve data
-  const bondingCurve = bondingCurveDetails ? {
-    target: bondingCurveDetails[0],
-    current: bondingCurveDetails[1],
-    basePrice: bondingCurveDetails[2],
-    currentPrice: bondingCurveDetails[3],
-    isFulfilled: bondingCurveDetails[4],
-    endTime: bondingCurveDetails[5]
-  } : undefined;
-
+  // Transaction state
   const { 
     data: approveHash,
     isPending: isApprovePending,
@@ -193,30 +144,163 @@ export function DebateView({ debateId }: DebateViewProps) {
     hash: orderHash,
   });
 
-  // Add effect to handle order confirmation
+  // Effect for handling order confirmation
   useEffect(() => {
     if (isOrderConfirmed) {
       console.log('Order confirmed, refreshing data...');
       // Reset form
       setAmount('0');
       setPotentialReturn('0.00');
-      setSelectedOutcome(null);
+      setSelectedGladiator(null);
       
       // Refetch all data
-      const refreshData = async () => {
-        try {
-          await refetchAllData();
-          console.log('Data refreshed successfully');
-        } catch (error) {
-          console.error('Error refreshing data:', error);
-        }
-      };
-      
-      refreshData();
+      refetchAllData();
     }
   }, [isOrderConfirmed]);
 
-  const publicClient = useClient({ config });
+  // Add state for tracking expanded cards
+  const [expandedCards, setExpandedCards] = useState({
+    aiDiscussion: true,
+    bondingCurve: true,
+    debateInfo: true,
+    gladiators: true,
+    leaderboard: true
+  });
+
+  const toggleCard = (cardName: keyof typeof expandedCards) => {
+    setExpandedCards(prev => ({
+      ...prev,
+      [cardName]: !prev[cardName]
+    }));
+  };
+
+  // Get market ID from debate ID
+  const { data: marketId, refetch: refetchMarketId } = useReadContract({
+    address: MARKET_FACTORY_ADDRESS,
+    abi: MARKET_FACTORY_ABI,
+    functionName: 'debateIdToMarketId',
+    args: [BigInt(debateId)],
+  });
+
+  // Get market details
+  const { data: marketDetails, refetch: refetchMarketDetails } = useReadContract({
+    address: MARKET_FACTORY_ADDRESS,
+    abi: MARKET_FACTORY_ABI,
+    functionName: 'getMarketDetails',
+    args: marketId ? [marketId] : undefined,
+  }) as { data: MarketDetails | undefined, refetch: () => void };
+
+  // Get gladiators
+  const { data: gladiators, refetch: refetchGladiators } = useReadContract({
+    address: MARKET_FACTORY_ADDRESS,
+    abi: MARKET_FACTORY_ABI,
+    functionName: 'getGladiators',
+    args: marketId ? [marketId] : undefined,
+  }) as { data: Gladiator[] | undefined, refetch: () => void };
+
+  // Get round info
+  const { data: roundInfo, refetch: refetchRoundInfo } = useReadContract({
+    address: MARKET_FACTORY_ADDRESS,
+    abi: MARKET_FACTORY_ABI,
+    functionName: 'getCurrentRound',
+    args: marketId ? [marketId] : undefined,
+  }) as { data: RoundInfo | undefined, refetch: () => void };
+
+  // Get leaderboard
+  const { data: leaderboard, refetch: refetchLeaderboard } = useReadContract({
+    address: MARKET_FACTORY_ADDRESS,
+    abi: MARKET_FACTORY_ABI,
+    functionName: 'getLeaderboard',
+    args: marketId ? [marketId] : undefined,
+  }) as { data: LeaderboardInfo | undefined, refetch: () => void };
+
+  // Get market prices
+  const { data: gladiatorPrices, refetch: refetchPrices } = useReadContract({
+    address: MARKET_FACTORY_ADDRESS,
+    abi: MARKET_FACTORY_ABI,
+    functionName: 'getMarketPrices',
+    args: marketId ? [marketId] : undefined,
+  }) as { data: bigint[] | undefined, refetch: () => void };
+
+  // Get market volumes
+  const { data: gladiatorVolumes, refetch: refetchVolumes } = useReadContract({
+    address: MARKET_FACTORY_ADDRESS,
+    abi: MARKET_FACTORY_ABI,
+    functionName: 'getMarketVolumes',
+    args: marketId ? [marketId] : undefined,
+  }) as { data: bigint[] | undefined, refetch: () => void };
+
+  // Get total volume
+  const { data: totalVolume, refetch: refetchTotalVolume } = useReadContract({
+    address: MARKET_FACTORY_ADDRESS,
+    abi: MARKET_FACTORY_ABI,
+    functionName: 'getTotalVolume',
+    args: marketId ? [marketId] : undefined,
+  }) as { data: bigint | undefined, refetch: () => void };
+
+  // Get bonding curve details
+  const { data: bondingCurveDetails, refetch: refetchBondingCurve } = useReadContract({
+    address: MARKET_FACTORY_ADDRESS,
+    abi: MARKET_FACTORY_ABI,
+    functionName: 'getBondingCurveDetails',
+    args: marketId ? [marketId] : undefined,
+  }) as { data: BondingCurve | undefined, refetch: () => void };
+
+  // Get user positions if connected
+  const { data: userPositions } = useReadContract({
+    address: MARKET_FACTORY_ADDRESS,
+    abi: MARKET_FACTORY_ABI,
+    functionName: 'getUserPositions',
+    args: marketId && address ? [marketId, address] : undefined,
+  }) as { data: bigint[] | undefined };
+
+  // Function to refetch all data
+  const refetchAllData = async () => {
+    await Promise.all([
+      refetchMarketId(),
+      refetchMarketDetails(),
+      refetchGladiators(),
+      refetchRoundInfo(),
+      refetchLeaderboard(),
+      refetchPrices(),
+      refetchVolumes(),
+      refetchTotalVolume(),
+      refetchBondingCurve()
+    ]);
+  };
+
+  // Loading check
+  if (!marketDetails || !gladiators || !gladiatorPrices || !bondingCurveDetails) {
+    return <div>Loading market details...</div>;
+  }
+
+  // Extract market details
+  const [
+    token,
+    _debateId,
+    resolved,
+    winningGladiator,
+    bondingCurveData,
+    totalBondingAmount
+  ] = marketDetails;
+
+  // Format bonding curve data
+  const bondingCurve = {
+    target: bondingCurveDetails[0],
+    current: bondingCurveDetails[1],
+    basePrice: bondingCurveDetails[2],
+    currentPrice: bondingCurveDetails[3],
+    isFulfilled: bondingCurveDetails[4],
+    endTime: bondingCurveDetails[5]
+  };
+
+  // Extract round info
+  const [roundIndex, roundStartTime, roundEndTime, isRoundComplete] = roundInfo || [0n, 0n, 0n, false];
+
+  // Calculate time remaining
+  const timeRemaining = Math.max(0, Number(bondingCurve.endTime) - Math.floor(Date.now() / 1000));
+  const daysRemaining = Math.floor(timeRemaining / (24 * 60 * 60));
+  const hoursRemaining = Math.floor((timeRemaining % (24 * 60 * 60)) / 3600);
 
   // Add allowance check
   const { data: currentAllowance } = useReadContract({
@@ -332,8 +416,8 @@ export function DebateView({ debateId }: DebateViewProps) {
     const numValue = parseFloat(value) || 0;
     setAmount(value);
     // Calculate potential return based on current price
-    if (selectedOutcome && outcomePrices) {
-      const price = Number(outcomePrices[Number(selectedOutcome.index)]) / 100;
+    if (selectedGladiator && outcomePrices) {
+      const price = Number(outcomePrices[Number(selectedGladiator.index)]) / 100;
       const return_value = orderType === 'buy' 
         ? numValue * (100 / price - 1)
         : numValue * (100 / (100 - price) - 1);
@@ -347,48 +431,10 @@ export function DebateView({ debateId }: DebateViewProps) {
     handleAmountChange(newAmount.toString());
   };
 
-  if (!debateDetails || !marketDetails || !outcomes || !outcomePrices || !bondingCurve) {
-    return <div>Loading market details...</div>;
-  }
-  const [
-    topic,
-    startTime,
-    duration,
-    debateEndTime,
-    currentRound,
-    totalRounds,
-    isActive,
-    creator,
-    market,
-    judges,
-    hasOutcome,
-    finalOutcome
-  ] = debateDetails;
-
-  // Extract market details as a tuple
-  const [
-    token,
-    _debateId,
-    resolved,
-    winningOutcome,
-    bondingCurveData,
-    totalBondingAmount
-  ] = marketDetails;
-
-  // Access bonding curve data directly as an object
-  const {
-    target,
-    current,
-    basePrice,
-    currentPrice,
-    isFulfilled,
-    endTime
-  } = bondingCurveData;
-
-  const endDate = new Date(Number(debateEndTime) * 1000);
-  const timeRemaining = Math.max(0, Number(debateEndTime) - Math.floor(Date.now() / 1000));
-  const daysRemaining = Math.floor(timeRemaining / (24 * 60 * 60));
-  const hoursRemaining = Math.floor((timeRemaining % (24 * 60 * 60)) / 3600);
+  console.log("marketDetails", marketDetails);
+  console.log("gladiators", gladiators);
+  console.log("gladiatorPrices", gladiatorPrices);
+  console.log("bondingCurveDetails", bondingCurveDetails);
 
   return (
     <div className="container mx-auto p-4 flex gap-4">
@@ -577,28 +623,28 @@ export function DebateView({ debateId }: DebateViewProps) {
           )}
         </Card>
 
-        {/* Outcomes List */}
+        {/* Gladiator List */}
         <Card className="bg-[#1C2128] border-0">
           <div 
             className="p-6 cursor-pointer flex justify-between items-center"
-            onClick={() => toggleCard('outcomes')}
+            onClick={() => toggleCard('gladiators')}
           >
-            <div className="text-sm text-gray-400">OUTCOME</div>
+            <div className="text-sm text-gray-400">GLADIATOR</div>
             <div className="flex items-center gap-2">
               <div className="text-sm text-gray-400">% CHANCE ↻</div>
-              <ChevronDown className={`w-5 h-5 transition-transform ${expandedCards.outcomes ? 'rotate-0' : '-rotate-90'}`} />
+              <ChevronDown className={`w-5 h-5 transition-transform ${expandedCards.gladiators ? 'rotate-0' : '-rotate-90'}`} />
             </div>
           </div>
-          {expandedCards.outcomes && (
+          {expandedCards.gladiators && (
             <CardContent className="pt-0">
               <div className="flex justify-between items-center mb-4">
-                <div className="text-sm text-gray-400">OUTCOME</div>
+                <div className="text-sm text-gray-400">GLADIATOR</div>
                 <div className="text-sm text-gray-400">% CHANCE ↻</div>
               </div>
               <div className="space-y-4">
-                {outcomes?.map((outcome, index) => {
-                  const currentPrice = Number(outcomePrices[index]) / 100;
-                  const volume = outcomeVolumes ? formatEther(outcomeVolumes[index]) : '0';
+                {gladiators?.map((gladiator, index) => {
+                  const currentPrice = Number(gladiatorPrices?.[index] || 0) / BASIS_POINTS;
+                  const volume = gladiatorVolumes ? formatEther(gladiatorVolumes[index]) : '0';
                   const volumePercentage = formattedTotalVolume !== '0'
                     ? ((Number(volume) / Number(formattedTotalVolume)) * 100).toFixed(1)
                     : '0';
@@ -613,10 +659,10 @@ export function DebateView({ debateId }: DebateViewProps) {
                   const noPrice = (1 - Number(impliedProbability) / 100).toFixed(2);
                   
                   return (
-                    <div key={outcome.index.toString()} className="border-t border-gray-800 pt-4">
+                    <div key={gladiator.index.toString()} className="border-t border-gray-800 pt-4">
                       <div className="flex justify-between items-start mb-2">
                         <div>
-                          <div className="font-medium">{outcome.name}</div>
+                          <div className="font-medium">{gladiator.name}</div>
                           <div className="text-sm text-gray-400">
                             ${volume} Vol. ({volumePercentage}%)
                           </div>
@@ -633,7 +679,7 @@ export function DebateView({ debateId }: DebateViewProps) {
                           variant="outline" 
                           className="flex-1 bg-[#1F3229] text-[#3FB950] border-[#238636] hover:bg-[#238636] hover:text-white"
                           onClick={() => {
-                            setSelectedOutcome(outcome);
+                            setSelectedGladiator(gladiator);
                             setOrderType('buy');
                             setAmount('1');
                             handleAmountChange('1');
@@ -646,8 +692,8 @@ export function DebateView({ debateId }: DebateViewProps) {
                           variant="outline" 
                           className="flex-1 bg-[#3B2325] text-[#F85149] border-[#F85149] hover:bg-[#F85149] hover:text-white"
                           onClick={() => {
-                            setSelectedOutcome(outcome);
-                            setOrderType('buy');
+                            setSelectedGladiator(gladiator);
+                            setOrderType('sell');
                             setAmount('1');
                             handleAmountChange('1');
                           }}
@@ -678,18 +724,18 @@ export function DebateView({ debateId }: DebateViewProps) {
                 </TabsList>
               </Tabs>
 
-              {/* Outcome Selection */}
+              {/* Gladiator Selection */}
               <div className="space-y-2">
-                <label className="text-sm text-gray-400">Outcome</label>
+                <label className="text-sm text-gray-400">Gladiator</label>
                 <div className="flex flex-col gap-2">
-                  {outcomes?.map((outcome) => (
+                  {gladiators?.map((gladiator) => (
                     <Button
-                      key={outcome.index.toString()}
-                      variant={selectedOutcome?.index === outcome.index ? "default" : "outline"}
+                      key={gladiator.index.toString()}
+                      variant={selectedGladiator?.index === gladiator.index ? "default" : "outline"}
                       className="w-full justify-start"
-                      onClick={() => setSelectedOutcome(outcome)}
+                      onClick={() => setSelectedGladiator(gladiator)}
                     >
-                      {outcome.name}
+                      {gladiator.name}
                     </Button>
                   ))}
                 </div>
@@ -735,12 +781,12 @@ export function DebateView({ debateId }: DebateViewProps) {
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Avg price</span>
-                  <span>{selectedOutcome && outcomePrices && outcomeVolumes && formattedTotalVolume ? 
+                  <span>{selectedGladiator && gladiatorPrices && gladiatorVolumes && formattedTotalVolume ? 
                     (() => {
-                      const volume = formatEther(outcomeVolumes[Number(selectedOutcome.index)]);
+                      const volume = formatEther(gladiatorVolumes[Number(selectedGladiator.index)]);
                       const impliedProbability = formattedTotalVolume !== '0'
                         ? (Number(volume) / Number(formattedTotalVolume))
-                        : Number(outcomePrices[Number(selectedOutcome.index)]) / 10000;
+                        : Number(gladiatorPrices[Number(selectedGladiator.index)]) / BASIS_POINTS;
                       return orderType === 'sell'
                         ? `${impliedProbability.toFixed(2)}¢`
                         : `${(1 - impliedProbability).toFixed(2)}¢`;
@@ -749,12 +795,12 @@ export function DebateView({ debateId }: DebateViewProps) {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Shares</span>
-                  <span>{selectedOutcome && outcomePrices && outcomeVolumes && formattedTotalVolume && parseFloat(amount) ? 
+                  <span>{selectedGladiator && gladiatorPrices && gladiatorVolumes && formattedTotalVolume && parseFloat(amount) ? 
                     (() => {
-                      const volume = formatEther(outcomeVolumes[Number(selectedOutcome.index)]);
+                      const volume = formatEther(gladiatorVolumes[Number(selectedGladiator.index)]);
                       const impliedProbability = formattedTotalVolume !== '0'
                         ? (Number(volume) / Number(formattedTotalVolume))
-                        : Number(outcomePrices[Number(selectedOutcome.index)]) / 10000;
+                        : Number(gladiatorPrices[Number(selectedGladiator.index)]) / BASIS_POINTS;
                       const avgPrice = orderType === 'sell' ? impliedProbability : (1 - impliedProbability);
                       return (parseFloat(amount) / avgPrice).toFixed(2);
                     })()
@@ -771,18 +817,18 @@ export function DebateView({ debateId }: DebateViewProps) {
                 className="w-full"
                 disabled={
                   !isConnected || 
-                  !selectedOutcome || 
+                  !selectedGladiator || 
                   parseFloat(amount) <= 0 || 
                   isApprovePending || 
                   isApproveConfirming || 
                   isOrderPending || 
                   isOrderConfirming
                 }
-                onClick={() => selectedOutcome && handlePlaceLimitOrder(selectedOutcome.index, orderType === 'buy')}
+                onClick={() => selectedGladiator && handlePlaceLimitOrder(selectedGladiator.index, orderType === 'buy')}
               >
                 {!isConnected 
                   ? 'Connect Wallet' 
-                  : !selectedOutcome 
+                  : !selectedGladiator 
                     ? 'Select Outcome'
                     : parseFloat(amount) <= 0 
                       ? 'Enter Amount'
