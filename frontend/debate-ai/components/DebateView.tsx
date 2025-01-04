@@ -13,6 +13,7 @@ import { waitForTransactionReceipt } from 'viem/actions';
 import { config } from '@/config/wallet-config';
 import { ChevronDown } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { BribeSubmission } from './BribeSubmission';
 
 type DebateDetails = [
   string,      // topic
@@ -469,6 +470,16 @@ export function DebateView({ debateId }: DebateViewProps) {
             </CardContent>
           )}
         </Card>
+
+        {/* Bribe Submission */}
+        {bondingCurve?.isFulfilled && (
+          <BribeSubmission
+            marketId={marketId}
+            roundId={currentRound}
+            outcomes={outcomes || []}
+            onBribeSubmitted={refetchAllData}
+          />
+        )}
 
         {/* Bonding Curve Progress */}
         <Card className="bg-[#1C2128] border-0">
