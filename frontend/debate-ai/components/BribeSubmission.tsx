@@ -29,6 +29,12 @@ export function BribeSubmission({ marketId, roundId, gladiators, onBribeSubmitte
   const [selectedGladiator, setSelectedGladiator] = useState<bigint | null>(null);
   const { isConnected } = useAccount();
 
+  console.log('BribeSubmission props:', {
+    marketId: marketId.toString(),
+    roundId: roundId.toString(),
+    gladiators: gladiators.map(g => ({ name: g.name, index: g.index.toString() }))
+  });
+
   const { writeContract: submitBribe, isPending } = useWriteContract();
 
   // Get existing bribes for this round with proper typing
@@ -42,9 +48,29 @@ export function BribeSubmission({ marketId, roundId, gladiators, onBribeSubmitte
   const typedBribesData = bribesData as BribesResponse | undefined;
 
   const handleSubmit = async () => {
-    if (!selectedGladiator || !information.trim()) return;
+    console.log('handleSubmit called with:', {
+      selectedGladiator: selectedGladiator?.toString(),
+      information,
+      isConnected,
+      isPending
+    });
+
+    if (!selectedGladiator || !information.trim()) {
+      console.log('Submit blocked:', {
+        hasSelectedGladiator: !!selectedGladiator,
+        hasInformation: !!information.trim()
+      });
+      return;
+    }
 
     try {
+      console.log('Submitting bribe with:', {
+        marketId: marketId.toString(),
+        roundId: roundId.toString(),
+        information,
+        selectedGladiator: selectedGladiator.toString()
+      });
+
       submitBribe({
         address: MARKET_FACTORY_ADDRESS,
         abi: MARKET_FACTORY_ABI,
@@ -65,6 +91,54 @@ export function BribeSubmission({ marketId, roundId, gladiators, onBribeSubmitte
     }
   };
 
+  const handleGladiatorSelect = (gladiator: { name: string; index: bigint }) => {
+    console.log('handleGladiatorSelect:', {
+      currentSelected: selectedGladiator?.toString(),
+      newSelection: gladiator.index.toString(),
+      gladiatorName: gladiator.name
+    });
+    
+    // Convert to BigInt to ensure proper type
+    const newSelection = BigInt(gladiator.index.toString());
+    setSelectedGladiator(newSelection);
+    
+    console.log('After selection:', {
+      newSelectionBigInt: newSelection.toString(),
+      gladiatorIndexBigInt: gladiator.index.toString()
+    });
+  };
+
+  const isGladiatorSelected = (gladiatorIndex: bigint) => {
+    if (!selectedGladiator) return false;
+    
+    // Convert both to BigInt strings for comparison
+    const selected = selectedGladiator.toString();
+    const current = gladiatorIndex.toString();
+    
+    const result = selected === current;
+    
+    console.log('isGladiatorSelected check:', {
+      gladiatorIndex: current,
+      selectedGladiator: selected,
+      result
+    });
+    
+    return result;
+  };
+
+  // Check if submit should be enabled
+  const isSubmitDisabled = () => {
+    const disabled = !isConnected || !selectedGladiator || !information.trim() || isPending;
+    console.log('Submit button state:', {
+      isConnected,
+      selectedGladiator: selectedGladiator?.toString(),
+      hasInformation: !!information.trim(),
+      isPending,
+      isDisabled: disabled
+    });
+    return disabled;
+  };
+
   return (
     <div className="space-y-4">
       <Card className="p-4 bg-[#1C2128] border-0">
@@ -77,8 +151,8 @@ export function BribeSubmission({ marketId, roundId, gladiators, onBribeSubmitte
               {gladiators.map((gladiator) => (
                 <Button
                   key={gladiator.index.toString()}
-                  variant={selectedGladiator === gladiator.index ? "default" : "outline"}
-                  onClick={() => setSelectedGladiator(gladiator.index)}
+                  variant={isGladiatorSelected(gladiator.index) ? "default" : "outline"}
+                  onClick={() => handleGladiatorSelect(gladiator)}
                   className="w-full"
                 >
                   {gladiator.name}
@@ -103,7 +177,7 @@ export function BribeSubmission({ marketId, roundId, gladiators, onBribeSubmitte
 
           <Button
             className="w-full"
-            disabled={!isConnected || !selectedGladiator || !information.trim() || isPending}
+            disabled={isSubmitDisabled()}
             onClick={handleSubmit}
           >
             {!isConnected 
@@ -128,7 +202,7 @@ export function BribeSubmission({ marketId, roundId, gladiators, onBribeSubmitte
                 </div>
                 <p className="text-sm">{typedBribesData[2][index]}</p>
                 <div className="text-xs text-gray-400 mt-1">
-                  Supporting: {gladiators.find(g => g.index === typedBribesData[4][index])?.name}
+                  Supporting: {gladiators.find(g => g.index.toString() === typedBribesData[4][index].toString())?.name}
                 </div>
               </div>
             ))}
