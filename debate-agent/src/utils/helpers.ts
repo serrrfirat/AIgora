@@ -30,6 +30,7 @@ export const defaultTwitterTemplate: TwitterTemplate = {
 	twitterPostTemplate: convertToOneLine(twitterPostTemplate),
 	twitterActionTemplate: convertToOneLine(twitterActionTemplate),
 	twitterMessageHandlerTemplate: convertToOneLine(twitterMessageHandlerTemplate),
+	// FIXME: correct handlers
 	twitterShouldRespondTemplate: convertToOneLine(twitterShouldRespondTemplate("@Gladiator1,@Gladiator2,@Gladiator3")),
 };
 
