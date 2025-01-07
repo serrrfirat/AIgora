@@ -39,3 +39,19 @@ export type Market = {
   gladiators: Gladiator[];
   currentRound: bigint;
 };
+
+export type Debate = {
+  topic: string;
+  startTime: bigint;
+  duration: bigint;
+  debateEndTime: bigint;
+  currentRound: bigint;
+  totalRounds: bigint;
+  isActive: boolean;
+  creator: string;
+  market: string;
+  judges: string[];
+  rounds: Round[];
+  finalOutcome: bigint;
+  hasOutcome: boolean;
+};
