@@ -1,4 +1,4 @@
-*.ts
+dist/
 !index.ts
 !character.ts
 .env
