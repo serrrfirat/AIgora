@@ -8,7 +8,7 @@ import { systemPrompt } from './prompts';
  * @param template - template for the gladiator behaviour
  * @returns the data needed for the gladiator
  */
-export function generateGladiatorData(agentName: string, agentRole: string, agentPersonality: string) {
+export function generateOrUpdateGladiatorData(agentName: string, agentRole: string, agentPersonality: string) {
 	const replacedSystemPrompt = replaceAgentValues(systemPrompt, agentName, agentRole, agentPersonality);
 	const systemPromptOneLine = convertToOneLine(replacedSystemPrompt);
 
