@@ -1,5 +1,6 @@
 import fs from 'fs';
-import { twitterActionTemplate, twitterPostTemplate } from './templates';
+import { continueMessageHandlerTemplate, evaluationTemplate, factsTemplate, goalsTemplate, shouldRespondTemplate, twitterActionTemplate, twitterMessageHandlerTemplate, twitterPostTemplate, twitterSearchTemplate, twitterShouldRespondTemplate } from './templates';
+import { messageHandlerTemplate } from '@ai16z/client-direct';
 
 /**
  * Template interface for what's needed for the Twitter agent.
@@ -19,17 +20,17 @@ export interface TwitterTemplate {
 }
 
 export const defaultTwitterTemplate: TwitterTemplate = {
-	goalsTemplate: "",
-	factsTemplate: "",
-	messageHandlerTemplate: "",
-	shouldRespondTemplate: "",
-	continueMessageHandlerTemplate: "",
-	evaluationTemplate: "",
-	twitterSearchTemplate: "",
+	goalsTemplate: convertToOneLine(goalsTemplate),
+	factsTemplate: convertToOneLine(factsTemplate),
+	messageHandlerTemplate: convertToOneLine(messageHandlerTemplate),
+	shouldRespondTemplate: convertToOneLine(shouldRespondTemplate),
+	continueMessageHandlerTemplate: convertToOneLine(continueMessageHandlerTemplate),
+	evaluationTemplate: convertToOneLine(evaluationTemplate),
+	twitterSearchTemplate: convertToOneLine(twitterSearchTemplate),
 	twitterPostTemplate: convertToOneLine(twitterPostTemplate),
 	twitterActionTemplate: convertToOneLine(twitterActionTemplate),
-	twitterMessageHandlerTemplate: "",
-	twitterShouldRespondTemplate: "",
+	twitterMessageHandlerTemplate: convertToOneLine(twitterMessageHandlerTemplate),
+	twitterShouldRespondTemplate: convertToOneLine(twitterShouldRespondTemplate("@Gladiator1,@Gladiator2,@Gladiator3")),
 };
 
 /**
