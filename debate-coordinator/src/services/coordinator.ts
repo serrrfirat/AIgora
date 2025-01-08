@@ -37,8 +37,9 @@ export class CoordinatorService {
   async initialize() {
     await this.redis.connect();
     await this.scraper.login(process.env.TWITTER_USERNAME!, process.env.TWITTER_PASSWORD!)
-    await this.handleBondingComplete(BigInt(5))
+    // await this.handleBondingComplete(BigInt(5))
     await this.startEventListening();
+    await this.startListeningRounds();
   }
 
   async cleanup() {
@@ -66,6 +67,25 @@ export class CoordinatorService {
     });
 
     // Store unwatch function for cleanup
+    return unwatch;
+  }
+
+  private async startListeningRounds(){
+    const unwatch = await this.wsClient.watchContractEvent({
+      address: MARKET_FACTORY_ADDRESS,
+      abi: MARKET_FACTORY_ABI,
+      eventName: 'RoundEnded',
+      onLogs: async (logs) => {
+        for (const log of logs) {
+          const marketId = log.args.marketId;
+          if (!marketId) continue;
+
+          console.log(`Round ended for market ${marketId}`);
+          await this.handleRoundEnded(marketId, log.args.roundIndex);
+        }
+      },
+    });
+    
     return unwatch;
   }
 
@@ -99,6 +119,42 @@ export class CoordinatorService {
 
     } catch (error) {
       console.error('Error handling bonding complete:', error);
+    }
+  }
+
+  private async handleRoundEnded(marketId: bigint, roundIndex: number){
+    try {
+      console.log(`Handling round ended for market ${marketId} and round ${roundIndex}`);
+
+    const round = await this.getRoundStatus(marketId, roundIndex);
+    if (!round) {
+      console.error(`Round ${roundIndex} not found for market ${marketId}`);
+      return;
+    }
+    // Get market details
+    const market = await this.getMarketDetails(marketId);
+    if (!market) {
+      console.error(`Market ${marketId} not found`);
+      return;
+    }
+
+    // Get debate details
+    const debate = await this.getDebateDetails(market.debateId);
+    if (!debate) {
+      console.error(`Debate ${market.debateId} not found`);
+      return;
+    }
+
+    // Get gladiators
+    const gladiators = await this.getGladiators(marketId);
+    if (!gladiators || gladiators.length === 0) {
+      console.error(`No gladiators found for market ${marketId}`);
+      return;
+    }
+    /// Call Marcus AIrelius to the thread
+    const marcusRequest = await this.scraper.sendTweet(`Marcus AIrelius, the judge, please deliver the verdict of this round. The topic is "${debate.topic}" and the gladiators are ${gladiators.map(g => g.name).join(', ')}. The timestamp is ${round.round.endTime}`);
+    } catch (error) {
+      console.error('Error handling round ended:', error);
     }
   }
 

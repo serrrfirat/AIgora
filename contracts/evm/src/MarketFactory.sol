@@ -141,11 +141,22 @@ contract MarketFactory is ReentrancyGuard, OwnableRoles {
         uint256 startTime,
         uint256 endTime
     );
+    event RoundEnded(
+        uint256 indexed marketId,
+        uint256 indexed roundIndex,
+        uint256 endTime
+    );
     event VerdictDelivered(
         uint256 indexed marketId,
         uint256 indexed roundIndex,
         uint256[] scores,
         uint256 timestamp
+    );
+    event GladiatorNominated(
+        uint256 indexed marketId,
+        address indexed gladiatorAddress,
+        string name,
+        uint256 indexed index
     );
 
     modifier onlyDuringBonding(uint256 marketId) {
@@ -165,9 +176,6 @@ contract MarketFactory is ReentrancyGuard, OwnableRoles {
     function createMarket(
         address _token,
         uint256 _debateId,
-        address[] memory _gladiatorAddresses,
-        string[] memory _gladiatorNames,
-        bytes[] memory _gladiatorPublicKeys,
         address _judgeAI,
         uint256 _bondingTarget,
         uint256 _bondingDuration,
@@ -176,8 +184,6 @@ contract MarketFactory is ReentrancyGuard, OwnableRoles {
         require(_token != address(0), "Invalid token");
         require(_judgeAI != address(0), "Invalid judge AI");
         require(debateIdToMarketId[_debateId] == 0, "Market exists");
-        require(_gladiatorAddresses.length > 1, "Need multiple gladiators");
-        require(_gladiatorAddresses.length == _gladiatorNames.length, "Mismatched gladiator info");
         require(_bondingTarget > 0, "Invalid bonding target");
         require(_bondingDuration > 0, "Invalid bonding duration");
 
@@ -200,22 +206,41 @@ contract MarketFactory is ReentrancyGuard, OwnableRoles {
             endTime: block.timestamp + _bondingDuration
         });
 
-        // Initialize gladiators
-        for (uint256 i = 0; i < _gladiatorAddresses.length; i++) {
-            market.gladiators.push(Gladiator({
-                aiAddress: _gladiatorAddresses[i],
-                name: _gladiatorNames[i],
-                index: i,
-                isActive: true,
-                publicKey: _gladiatorPublicKeys[i]
-            }));
-        }
-
         // Register market
         debateIdToMarketId[_debateId] = marketId;
         marketIdToDebateId[marketId] = _debateId;
 
-        emit MarketCreated(marketId, _token, _debateId, _gladiatorNames);
+        emit MarketCreated(marketId, _token, _debateId, new string[](0));
+    }
+
+    function nominateGladiator(
+        uint256 marketId,
+        address gladiatorAddress,
+        string calldata gladiatorName,
+        bytes calldata publicKey
+    ) external {
+        Market storage market = markets[marketId];
+        require(!market.bondingCurve.isFulfilled, "Bonding complete");
+        require(gladiatorAddress != address(0), "Invalid gladiator address");
+        require(bytes(gladiatorName).length > 0, "Invalid gladiator name");
+        require(publicKey.length > 0, "Invalid public key");
+
+        // Check if gladiator already exists
+        for (uint256 i = 0; i < market.gladiators.length; i++) {
+            require(market.gladiators[i].aiAddress != gladiatorAddress, "Gladiator exists");
+            require(keccak256(bytes(market.gladiators[i].name)) != keccak256(bytes(gladiatorName)), "Name taken");
+        }
+
+        // Add new gladiator
+        market.gladiators.push(Gladiator({
+            aiAddress: gladiatorAddress,
+            name: gladiatorName,
+            index: market.gladiators.length,
+            isActive: true,
+            publicKey: publicKey
+        }));
+
+        emit GladiatorNominated(marketId, gladiatorAddress, gladiatorName, market.gladiators.length - 1);
     }
 
     function startNewRound(uint256 marketId) external {
@@ -223,6 +248,7 @@ contract MarketFactory is ReentrancyGuard, OwnableRoles {
         require(!market.resolved, "Market resolved");
         require(market.bondingCurve.isFulfilled, "Bonding not complete");
         
+        uint256 currentRound = market.currentRound;
         uint256 roundIndex = market.currentRound++;
         Round storage round = market.rounds[roundIndex];
         
@@ -235,6 +261,11 @@ contract MarketFactory is ReentrancyGuard, OwnableRoles {
             roundIndex,
             round.startTime,
             round.endTime
+        );
+        emit RoundEnded(
+            marketId,
+            currentRound,
+            market.rounds[currentRound].endTime
         );
     }
 
