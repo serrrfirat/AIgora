@@ -5,19 +5,21 @@ import { createPublicClient, createWalletClient, http, webSocket } from 'viem';
 import { DEBATE_FACTORY_ABI, DEBATE_FACTORY_ADDRESS, MARKET_FACTORY_ABI, MARKET_FACTORY_ADDRESS } from './contracts';
 import { holesky } from 'viem/chains';
 import { TwitterApi } from 'twitter-api-v2';
+import { Scraper } from 'agent-twitter-client';
 
 export class CoordinatorService {
   private redis: RedisService;
   private publicClient;
   private wsClient;
-  private twitterClient;
-
+  private scraper: Scraper;
   constructor() {
     if (!process.env.RPC_URL) throw new Error('RPC_URL environment variable is not set');
     if (!process.env.WSS_RPC_URL) throw new Error('WSS_RPC_URL environment variable is not set');
 
     this.redis = new RedisService();
+    this.scraper = new Scraper();
     
+
     // Initialize WebSocket client for event listening
     this.wsClient = createPublicClient({
       chain: holesky,
@@ -30,12 +32,12 @@ export class CoordinatorService {
       transport: http(process.env.RPC_URL)
     });
 
-    // Initialize Twitter client
-    this.twitterClient = new TwitterApi(process.env.TWITTER_BEARER_TOKEN!);
   }
 
   async initialize() {
     await this.redis.connect();
+    await this.scraper.login(process.env.TWITTER_USERNAME!, process.env.TWITTER_PASSWORD!)
+    await this.handleBondingComplete(BigInt(5))
     await this.startEventListening();
   }
 
@@ -93,34 +95,78 @@ export class CoordinatorService {
       }
 
       // Create Twitter thread
-      await this.createTwitterThread(debate, market, gladiators);
+      await this.createTwitterThread(market, gladiators);
 
     } catch (error) {
       console.error('Error handling bonding complete:', error);
     }
   }
 
-  private async createTwitterThread(debate: Debate, market: Market, gladiators: Gladiator[]) {
+  private async createTwitterThread(market: Market, gladiators: Gladiator[]) {
     try {
-      // Create initial tweet with market ID
-      const initialTweet = await this.twitterClient.v2.tweet(
-        `🎭 New AI Debate Starting! 🎭\n\nMarket ID: ${market.id}\n\nBonding target reached! The debate will begin shortly.`
+      // Create initial tweet with market ID and timestamp
+      const timestamp = new Date().toISOString();
+      const initialTweetResponse = await this.scraper.sendTweet(
+        `🎭 New AI Debate Starting! 🎭\n\nMarket ID: ${market.id}\n\nBonding target reached! The debate will begin shortly.\n\n${timestamp}`
       );
+
+      // Read the response stream
+      const reader = initialTweetResponse.body.getReader();
+      const decoder = new TextDecoder();
+      let tweetData = '';
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        tweetData += decoder.decode(value);
+      }
+
+      const initialTweetJson = JSON.parse(tweetData);
+      const initialTweetId = initialTweetJson?.data?.create_tweet?.tweet_results?.result?.rest_id;
+
+      if (!initialTweetId) {
+        console.error('Failed to get initial tweet ID:', initialTweetJson);
+        return;
+      }
+
+      console.log('Initial tweet created with ID:', initialTweetId);
 
       // Create thread introducing gladiators
-      const gladiatorTweets = await Promise.all(
-        gladiators.map(async (gladiator) => {
-          return this.twitterClient.v2.reply(
-            `Meet Gladiator ${gladiator.name} (@${gladiator.name})\n\nReady to debate! 🤖`,
-            initialTweet.data.id
-          );
-        })
-      );
+      let lastTweetId = initialTweetId;
+      for (const gladiator of gladiators) {
+        const gladTimestamp = new Date().toISOString();
+        const gladiatorTweetResponse = await this.scraper.sendTweet(
+          `Meet Gladiator ${gladiator.name} (@${gladiator.name})\n\nReady to debate! 🤖\n\n${gladTimestamp}`,
+          lastTweetId
+        );
+
+        // Read the response stream
+        const gladReader = gladiatorTweetResponse.body.getReader();
+        let gladTweetData = '';
+        
+        while (true) {
+          const { done, value } = await gladReader.read();
+          if (done) break;
+          gladTweetData += decoder.decode(value);
+        }
+
+        const gladTweetJson = JSON.parse(gladTweetData);
+        lastTweetId = gladTweetJson?.data?.create_tweet?.tweet_results?.result?.rest_id;
+
+        if (!lastTweetId) {
+          console.error('Failed to get gladiator tweet ID:', gladTweetJson);
+          continue;
+        }
+
+        // Add a small delay between tweets
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
 
       // Final tweet with call to action
-      await this.twitterClient.v2.reply(
-        `Follow this thread to watch these AI gladiators debate in real-time! 🍿\n\nMay the best argument win! 🏆`,
-        gladiatorTweets[gladiatorTweets.length - 1].data.id
+      const finalTimestamp = new Date().toISOString();
+      await this.scraper.sendTweet(
+        `Follow this thread to watch these AI gladiators debate in real-time! 🍿\n\nMay the best argument win! 🏆\n\n${finalTimestamp}`,
+        lastTweetId
       );
 
       console.log(`Twitter thread created for market ${market.id}`);
