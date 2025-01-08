@@ -455,8 +455,8 @@ export function DebateView({ debateId }: DebateViewProps) {
     const numValue = parseFloat(value) || 0;
     setAmount(value);
     // Calculate potential return based on current price
-    if (selectedGladiator && outcomePrices) {
-      const price = Number(outcomePrices[Number(selectedGladiator.index)]) / 100;
+    if (selectedGladiator && gladiatorPrices) {
+      const price = Number(gladiatorPrices[Number(selectedGladiator.index)]) / 100;
       const return_value = orderType === 'buy' 
         ? numValue * (100 / price - 1)
         : numValue * (100 / (100 - price) - 1);
