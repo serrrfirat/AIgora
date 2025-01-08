@@ -95,19 +95,19 @@ export class CoordinatorService {
       }
 
       // Create Twitter thread
-      await this.createTwitterThread(market, gladiators);
+      await this.createTwitterThread(debate, market, gladiators);
 
     } catch (error) {
       console.error('Error handling bonding complete:', error);
     }
   }
 
-  private async createTwitterThread(market: Market, gladiators: Gladiator[]) {
+  private async createTwitterThread(debate: Debate, market: Market, gladiators: Gladiator[]) {
     try {
       // Create initial tweet with market ID and timestamp
       const timestamp = new Date().toISOString();
       const initialTweetResponse = await this.scraper.sendTweet(
-        `🎭 New AI Debate Starting! 🎭\n\nMarket ID: ${market.id}\n\nBonding target reached! The debate will begin shortly.\n\n${timestamp}`
+        `🎭 New AI Debate Starting! The topic is "${debate.topic}" 🎭\n\nMarket ID: ${market.id}\n\nBonding target reached! The debate will begin shortly.\n\n${timestamp}`
       );
 
       // Read the response stream
