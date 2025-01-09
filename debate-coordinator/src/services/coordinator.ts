@@ -5,6 +5,8 @@ import { createPublicClient, createWalletClient, http, webSocket } from 'viem';
 import { DEBATE_FACTORY_ABI, DEBATE_FACTORY_ADDRESS, MARKET_FACTORY_ABI, MARKET_FACTORY_ADDRESS } from './contracts';
 import { holesky } from 'viem/chains';
 import { TwitterApi } from 'twitter-api-v2';
+import { ChatService } from './chat';
+import { AgentClient } from './agent-client';
 import { Scraper } from 'agent-twitter-client';
 
 export class CoordinatorService {
@@ -12,13 +14,17 @@ export class CoordinatorService {
   private publicClient;
   private wsClient;
   private scraper: Scraper;
+  private chatService: ChatService;
+  private agentClient: AgentClient;
+
   constructor() {
     if (!process.env.RPC_URL) throw new Error('RPC_URL environment variable is not set');
     if (!process.env.WSS_RPC_URL) throw new Error('WSS_RPC_URL environment variable is not set');
 
     this.redis = new RedisService();
+    this.agentClient = new AgentClient();
+    this.chatService = new ChatService(this.redis, this.agentClient);
     this.scraper = new Scraper();
-    
 
     // Initialize WebSocket client for event listening
     this.wsClient = createPublicClient({
@@ -31,7 +37,6 @@ export class CoordinatorService {
       chain: holesky,
       transport: http(process.env.RPC_URL)
     });
-
   }
 
   async initialize() {
@@ -40,6 +45,12 @@ export class CoordinatorService {
     // await this.handleBondingComplete(BigInt(5))
     await this.startEventListening();
     await this.startListeningRounds();
+
+    // Register agent servers from environment variables
+    const agentServers = process.env.AGENT_SERVERS ? JSON.parse(process.env.AGENT_SERVERS) : {};
+    for (const [agentId, url] of Object.entries(agentServers)) {
+      this.agentClient.registerAgent(agentId, url as string);
+    }
   }
 
   async cleanup() {
@@ -47,6 +58,76 @@ export class CoordinatorService {
     await this.wsClient.destroy();
   }
 
+  // Chat room management functions
+  async createDebateChatRoom(debateId: bigint) {
+    try {
+      // Create the chat room
+      const roomKey = await this.chatService.createChatRoom(debateId);
+      console.log(`Created chat room ${roomKey} for debate ${debateId}`);
+
+      // Get market ID from debate ID
+      const marketId = await this.getMarketIdFromDebateId(debateId);
+      if (!marketId) {
+        throw new Error(`No market found for debate ${debateId}`);
+      }
+
+      // Get gladiators and add them to the room
+      const gladiators = await this.getGladiators(marketId);
+      for (const gladiator of gladiators) {
+        await this.chatService.joinChatRoom(
+          debateId,
+          gladiator.name,
+        );
+        console.log(`Added gladiator ${gladiator.name} to chat room ${roomKey}`);
+      }
+
+      return roomKey;
+    } catch (error) {
+      console.error('Error creating debate chat room:', error);
+      throw error;
+    }
+  }
+
+  async startDebateDiscussion(debateId: bigint) {
+    try {
+      // Get market ID from debate ID
+      const marketId = await this.getMarketIdFromDebateId(debateId);
+      if (!marketId) {
+        throw new Error(`No market found for debate ${debateId}`);
+      }
+
+      // Get gladiators
+      const gladiators = await this.getGladiators(marketId);
+      const gladiatorConfigs = gladiators.map(g => ({
+        name: g.name,
+        agentId: g.aiAddress,
+        index: Number(g.index)
+      }));
+
+      // Start the discussion
+      await this.chatService.facilitateDebateDiscussion(debateId, gladiatorConfigs);
+    } catch (error) {
+      console.error('Error starting debate discussion:', error);
+      throw error;
+    }
+  }
+
+  private async getMarketIdFromDebateId(debateId: bigint): Promise<bigint | null> {
+    try {
+      const marketId = await this.publicClient.readContract({
+        address: MARKET_FACTORY_ADDRESS,
+        abi: MARKET_FACTORY_ABI,
+        functionName: 'debateIdToMarketId',
+        args: [debateId]
+      });
+      return marketId as bigint;
+    } catch (error) {
+      console.error('Error getting market ID from debate ID:', error);
+      return null;
+    }
+  }
+
+  // Keep existing event listening and handling functions
   private async startEventListening() {
     console.log('Starting event listening...');
 
@@ -66,26 +147,33 @@ export class CoordinatorService {
       },
     });
 
-    // Store unwatch function for cleanup
     return unwatch;
   }
 
-  private async startListeningRounds(){
+  private async startListeningRounds() {
     const unwatch = await this.wsClient.watchContractEvent({
       address: MARKET_FACTORY_ADDRESS,
       abi: MARKET_FACTORY_ABI,
-      eventName: 'RoundEnded',
+      eventName: 'RoundStarted',
       onLogs: async (logs) => {
         for (const log of logs) {
           const marketId = log.args.marketId;
-          if (!marketId) continue;
+          const roundIndex = log.args.roundIndex;
+          if (!marketId || roundIndex === undefined) continue;
 
-          console.log(`Round ended for market ${marketId}`);
-          await this.handleRoundEnded(marketId, log.args.roundIndex);
+          console.log(`Round started for market ${marketId}, round ${roundIndex}`);
+          
+          // Get debate ID
+          const market = await this.getMarketDetails(marketId);
+          if (!market) continue;
+
+          // Create chat room if it doesn't exist and start discussion
+          await this.createDebateChatRoom(market.debateId);
+          await this.startDebateDiscussion(market.debateId);
         }
       },
     });
-    
+
     return unwatch;
   }
 
@@ -126,7 +214,7 @@ export class CoordinatorService {
     try {
       console.log(`Handling round ended for market ${marketId} and round ${roundIndex}`);
 
-    const round = await this.getRoundStatus(marketId, roundIndex);
+    const round = await this.getCurrentRound(marketId);
     if (!round) {
       console.error(`Round ${roundIndex} not found for market ${marketId}`);
       return;
@@ -231,6 +319,7 @@ export class CoordinatorService {
     }
   }
 
+  // Contract interaction methods
   async getMarketDetails(marketId: bigint): Promise<Market | null> {
     try {
       console.log(`Getting market details for market ${marketId}`);
@@ -337,37 +426,4 @@ export class CoordinatorService {
       return [];
     }
   }
-
-  async getRoundVerdict(marketId: bigint, roundIndex: number) {
-    const data = await this.publicClient.readContract({
-      address: MARKET_FACTORY_ADDRESS,
-      abi: MARKET_FACTORY_ABI,
-      functionName: 'getRoundVerdict',
-      args: [marketId, roundIndex]
-    });
-
-    return {
-      scores: data[0] as bigint[],
-      timestamp: data[1] as bigint
-    };
-  }
-
-  async getRoundStatus(marketId: bigint, roundIndex: number) {
-    const [round, messages, verdict] = await Promise.all([
-      this.getCurrentRound(marketId),
-      this.redis.getMessages(marketId, roundIndex),
-      this.getRoundVerdict(marketId, roundIndex)
-    ]);
-    
-    return {
-      round,
-      messages,
-      verdict
-    };
-  }
-  async getAllMessagesByMarketId(marketId: bigint){
-    const messages = await this.redis.getAllMessagesByMarketId(marketId);
-    return messages;
-  }
-  
 }
