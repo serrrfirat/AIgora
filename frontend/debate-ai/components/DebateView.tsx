@@ -12,7 +12,6 @@ import { Input } from '@/components/ui/input';
 import { waitForTransactionReceipt } from 'viem/actions';
 import { config } from '@/config/wallet-config';
 import { ChevronDown } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { BribeSubmission } from './BribeSubmission';
 
 interface Message {
@@ -134,7 +133,6 @@ interface DebateViewProps {
 
 export function DebateView({ debateId }: DebateViewProps) {
   const { isConnected, address } = useAccount();
-  const router = useRouter();
   const publicClient = useClient({ config });
 
   // Component state
@@ -214,6 +212,11 @@ export function DebateView({ debateId }: DebateViewProps) {
     functionName: 'debateIdToMarketId',
     args: [BigInt(debateId)],
   });
+
+  // Log market ID changes
+  useEffect(() => {
+    console.log('[DebateView] marketId changed:', marketId?.toString());
+  }, [marketId]);
 
   // Get market details
   const { data: marketDetails, refetch: refetchMarketDetails } = useReadContract({
@@ -309,33 +312,106 @@ export function DebateView({ debateId }: DebateViewProps) {
 
   // Effect to fetch and subscribe to chat messages
   useEffect(() => {
-    console.log("marketId", marketId);
-    if (!marketId) return;
+    console.log("[DebateView] Chat effect triggered with marketId:", marketId?.toString());
+    if (!marketId) {
+      console.log("[DebateView] No valid marketId yet");
+      return;
+    }
+
+    // Convert marketId to bigint to ensure type safety
+    const marketIdBigInt = BigInt(marketId.toString());
+
+    let ws: WebSocket;
+    let isWsConnected = false;
 
     const fetchMessages = async () => {
       try {
-        const response = await fetch(`/api/chat/${marketId}`);
+        console.log("[DebateView] Fetching messages for market:", marketIdBigInt.toString());
+        const response = await fetch(`/api/chat/${marketIdBigInt}`, {
+          method: 'GET',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+            // Add a timestamp to force unique requests
+            'X-Request-Time': Date.now().toString()
+          },
+          // Disable caching at fetch level
+          cache: 'no-store',
+          next: { revalidate: 0 }
+        });
+        if (!response.ok) {
+          console.error("[DebateView] HTTP error from API:", response.status, response.statusText);
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
         const messages = await response.json();
-        console.log("messages", messages);
+        if ('error' in messages) {
+          console.error("[DebateView] API returned error:", messages.error);
+          return;
+        }
+        console.log("[DebateView] Received messages:", messages);
         setChatMessages(messages);
       } catch (error) {
-        console.error('Error fetching chat messages:', error);
+        console.error('[DebateView] Error fetching chat messages:', error);
       }
     };
 
-    // Initial fetch
-    fetchMessages();
-
     // Set up WebSocket connection
-    const ws = new WebSocket(`${process.env.NEXT_PUBLIC_WS_URL}/chat/${marketId}`);
-    
-    ws.onmessage = (event) => {
-      const message = JSON.parse(event.data);
-      setChatMessages(prev => [...prev, message]);
+    const setupWebSocket = () => {
+      if (!process.env.NEXT_PUBLIC_WS_URL) {
+        console.error("[DebateView] NEXT_PUBLIC_WS_URL not set");
+        return;
+      }
+
+      console.log("[DebateView] Setting up WebSocket for market:", marketIdBigInt.toString());
+      const wsUrl = `${process.env.NEXT_PUBLIC_WS_URL}/chat/${marketIdBigInt}`;
+      console.log("[DebateView] WebSocket URL:", wsUrl);
+      ws = new WebSocket(wsUrl);
+      
+      ws.onopen = () => {
+        console.log("[DebateView] WebSocket connected");
+        isWsConnected = true;
+        // Fetch messages after WebSocket is connected
+        fetchMessages();
+      };
+
+      ws.onerror = (error) => {
+        console.error("[DebateView] WebSocket error:", error);
+        isWsConnected = false;
+      };
+      
+      ws.onclose = () => {
+        console.log("[DebateView] WebSocket closed");
+        isWsConnected = false;
+        // Try to reconnect after a delay
+        setTimeout(() => {
+          if (!isWsConnected) {
+            console.log("[DebateView] Attempting to reconnect WebSocket...");
+            setupWebSocket();
+          }
+        }, 3000);
+      };
+      
+      ws.onmessage = (event) => {
+        console.log("[DebateView] Received WebSocket message:", event.data);
+        try {
+          const message = JSON.parse(event.data);
+          setChatMessages(prev => [...prev, message]);
+        } catch (error) {
+          console.error("[DebateView] Error parsing WebSocket message:", error);
+        }
+      };
     };
 
+    // Start WebSocket connection
+    setupWebSocket();
+
     return () => {
-      ws.close();
+      console.log("[DebateView] Cleaning up WebSocket connection");
+      isWsConnected = false;
+      if (ws) {
+        ws.close();
+      }
     };
   }, [marketId]);
 
@@ -371,10 +447,8 @@ export function DebateView({ debateId }: DebateViewProps) {
     finalOutcome
   ] = debateDetails || [];
 
-  // Loading check
-  if (!marketDetails || !gladiators || !gladiatorPrices || !bondingCurveDetails || !debateDetails) {
-    return <div>Loading market details...</div>;
-  }
+  // Loading check for market data
+  const isMarketDataLoading = !marketDetails || !gladiators || !gladiatorPrices || !bondingCurveDetails || !debateDetails;
 
   // Format total volume
   const totalVolumeFormatted = formatEther(totalVolume || 0n);
@@ -383,20 +457,20 @@ export function DebateView({ debateId }: DebateViewProps) {
   const endDate = debateEndTime ? new Date(Number(debateEndTime) * 1000) : new Date();
 
   // Format bonding curve data
-  const bondingCurve = {
+  const bondingCurve = bondingCurveDetails ? {
     target: bondingCurveDetails[0],
     current: bondingCurveDetails[1],
     basePrice: bondingCurveDetails[2],
     currentPrice: bondingCurveDetails[3],
     isFulfilled: bondingCurveDetails[4],
     endTime: bondingCurveDetails[5]
-  };
+  } : null;
 
   // Extract round info
   const [roundIndex, roundStartTime, roundEndTime, isRoundComplete] = roundInfo || [0n, 0n, 0n, false];
 
   // Calculate time remaining
-  const timeRemaining = Math.max(0, Number(bondingCurve.endTime) - Math.floor(Date.now() / 1000));
+  const timeRemaining = bondingCurve ? Math.max(0, Number(bondingCurve.endTime) - Math.floor(Date.now() / 1000)) : 0;
   const daysRemaining = Math.floor(timeRemaining / (24 * 60 * 60));
   const hoursRemaining = Math.floor((timeRemaining % (24 * 60 * 60)) / 3600);
 
@@ -576,7 +650,7 @@ export function DebateView({ debateId }: DebateViewProps) {
                       Once the bonding curve target is reached, three expert AI agents will begin analyzing and debating this topic in real-time.
                     </p>
                     <div className="text-sm text-blue-400">
-                      Progress: {((Number(bondingCurve?.current || 0) * 100) / Number(bondingCurve?.target || 1)).toFixed(1)}% to unlock
+                      Progress: {bondingCurve ? ((Number(bondingCurve.current) * 100) / Number(bondingCurve.target)).toFixed(1) : '0'}% to unlock
                     </div>
                   </div>
                 </div>
@@ -585,199 +659,206 @@ export function DebateView({ debateId }: DebateViewProps) {
           )}
         </Card>
 
-        {/* Bribe Submission */}
-        {bondingCurve?.isFulfilled && (
-          <BribeSubmission
-            marketId={marketId}
-            roundId={roundIndex}
-            gladiators={gladiators}
-            onBribeSubmitted={refetchAllData}
-          />
-        )}
+        {/* Rest of the components */}
+        {isMarketDataLoading ? (
+          <div>Loading market details...</div>
+        ) : (
+          <>
+            {/* Bribe Submission */}
+            {bondingCurve?.isFulfilled && marketId && (
+              <BribeSubmission
+                marketId={BigInt(marketId.toString())}
+                roundId={roundIndex}
+                gladiators={gladiators}
+                onBribeSubmitted={refetchAllData}
+              />
+            )}
 
-        {/* Bonding Curve Progress */}
-        <Card className="bg-[#1C2128] border-0">
-          <div 
-            className="p-6 cursor-pointer flex justify-between items-center"
-            onClick={() => toggleCard('bondingCurve')}
-          >
-            <div className="text-sm text-gray-400">Bonding Curve Progress</div>
-            <div className="flex items-center gap-2">
-              <div className="text-sm font-medium">
-                {formatEther(bondingCurve?.current || 0n)}/${formatEther(bondingCurve?.target || 0n)}
-              </div>
-              <ChevronDown className={`w-5 h-5 transition-transform ${expandedCards.bondingCurve ? 'rotate-0' : '-rotate-90'}`} />
-            </div>
-          </div>
-          {expandedCards.bondingCurve && (
-            <CardContent className="pt-0">
-              <div className="space-y-4">
-                <div className="flex justify-between items-center mb-2">
-                  <div className="text-sm text-gray-400">Bonding Curve Progress</div>
+            {/* Bonding Curve Progress */}
+            <Card className="bg-[#1C2128] border-0">
+              <div 
+                className="p-6 cursor-pointer flex justify-between items-center"
+                onClick={() => toggleCard('bondingCurve')}
+              >
+                <div className="text-sm text-gray-400">Bonding Curve Progress</div>
+                <div className="flex items-center gap-2">
                   <div className="text-sm font-medium">
-                    {formatEther(bondingCurve?.current || 0n)}/{formatEther(bondingCurve?.target || 0n)}
+                    {formatEther(bondingCurve?.current || 0n)}/${formatEther(bondingCurve?.target || 0n)}
                   </div>
-                </div>
-                <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-blue-500 rounded-full transition-all duration-500"
-                    style={{ 
-                      width: `${Math.min(100, (Number(bondingCurve?.current || 0n) * 100) / Number(bondingCurve?.target || 0n))}%`,
-                      backgroundColor: bondingCurve?.isFulfilled ? '#3FB950' : '#2F81F7'
-                    }}
-                  />
-                </div>
-                <div className="flex justify-between text-xs text-gray-400">
-                  <div>Current: ${formatEther(bondingCurve?.current || 0n)}</div>
-                  <div>Target: ${formatEther(bondingCurve?.target || 0n)}</div>
+                  <ChevronDown className={`w-5 h-5 transition-transform ${expandedCards.bondingCurve ? 'rotate-0' : '-rotate-90'}`} />
                 </div>
               </div>
-            </CardContent>
-          )}
-        </Card>
-
-        {/* Debate Information */}
-        <Card className="bg-[#1C2128] border-0">
-          <div 
-            className="p-6 cursor-pointer flex justify-between items-center"
-            onClick={() => toggleCard('debateInfo')}
-          >
-            <div className="text-sm text-gray-400">Debate Information</div>
-            <ChevronDown className={`w-5 h-5 transition-transform ${expandedCards.debateInfo ? 'rotate-0' : '-rotate-90'}`} />
-          </div>
-          {expandedCards.debateInfo && (
-            <CardContent className="pt-0">
-              <div className="space-y-4">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h2 className="text-xl font-bold mb-2">{topic || 'Loading...'}</h2>
-                    <div className="text-sm text-gray-400">Created by {formatAddress(creator || '')}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-medium">
-                      {isActive ? (
-                        <span className="text-green-400">Active</span>
-                      ) : (
-                        <span className="text-red-400">Ended</span>
-                      )}
-                    </div>
-                    {isActive && (
-                      <div className="text-sm text-gray-400">
-                        {daysRemaining}d {hoursRemaining}h remaining
+              {expandedCards.bondingCurve && (
+                <CardContent className="pt-0">
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <div className="text-sm text-gray-400">Bonding Curve Progress</div>
+                      <div className="text-sm font-medium">
+                        {formatEther(bondingCurve?.current || 0n)}/{formatEther(bondingCurve?.target || 0n)}
                       </div>
-                    )}
+                    </div>
+                    <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                        style={{ 
+                          width: `${Math.min(100, (Number(bondingCurve?.current || 0n) * 100) / Number(bondingCurve?.target || 0n))}%`,
+                          backgroundColor: bondingCurve?.isFulfilled ? '#3FB950' : '#2F81F7'
+                        }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-400">
+                      <div>Current: ${formatEther(bondingCurve?.current || 0n)}</div>
+                      <div>Target: ${formatEther(bondingCurve?.target || 0n)}</div>
+                    </div>
                   </div>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-gray-800">
-                  <div>
-                    <div className="text-sm text-gray-400">Total Volume</div>
-                    <div className="font-medium">${totalVolumeFormatted}</div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-gray-400">Round</div>
-                    <div className="font-medium">{currentRound?.toString() || '0'}/{totalRounds?.toString() || '0'}</div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-gray-400">End Date</div>
-                    <div className="font-medium">{endDate.toLocaleDateString()}</div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-gray-400">Judges</div>
-                    <div className="font-medium">{judges?.length || 0}</div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          )}
-        </Card>
+                </CardContent>
+              )}
+            </Card>
 
-        {/* Gladiator List */}
-        <Card className="bg-[#1C2128] border-0">
-          <div 
-            className="p-6 cursor-pointer flex justify-between items-center"
-            onClick={() => toggleCard('gladiators')}
-          >
-            <div className="text-sm text-gray-400">GLADIATOR</div>
-            <div className="flex items-center gap-2">
-              <div className="text-sm text-gray-400">% CHANCE ↻</div>
-              <ChevronDown className={`w-5 h-5 transition-transform ${expandedCards.gladiators ? 'rotate-0' : '-rotate-90'}`} />
-            </div>
-          </div>
-          {expandedCards.gladiators && (
-            <CardContent className="pt-0">
-              <div className="flex justify-between items-center mb-4">
+            {/* Debate Information */}
+            <Card className="bg-[#1C2128] border-0">
+              <div 
+                className="p-6 cursor-pointer flex justify-between items-center"
+                onClick={() => toggleCard('debateInfo')}
+              >
+                <div className="text-sm text-gray-400">Debate Information</div>
+                <ChevronDown className={`w-5 h-5 transition-transform ${expandedCards.debateInfo ? 'rotate-0' : '-rotate-90'}`} />
+              </div>
+              {expandedCards.debateInfo && (
+                <CardContent className="pt-0">
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h2 className="text-xl font-bold mb-2">{topic || 'Loading...'}</h2>
+                        <div className="text-sm text-gray-400">Created by {formatAddress(creator || '')}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-medium">
+                          {isActive ? (
+                            <span className="text-green-400">Active</span>
+                          ) : (
+                            <span className="text-red-400">Ended</span>
+                          )}
+                        </div>
+                        {isActive && (
+                          <div className="text-sm text-gray-400">
+                            {daysRemaining}d {hoursRemaining}h remaining
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-gray-800">
+                      <div>
+                        <div className="text-sm text-gray-400">Total Volume</div>
+                        <div className="font-medium">${totalVolumeFormatted}</div>
+                      </div>
+                      <div>
+                        <div className="text-sm text-gray-400">Round</div>
+                        <div className="font-medium">{currentRound?.toString() || '0'}/{totalRounds?.toString() || '0'}</div>
+                      </div>
+                      <div>
+                        <div className="text-sm text-gray-400">End Date</div>
+                        <div className="font-medium">{endDate.toLocaleDateString()}</div>
+                      </div>
+                      <div>
+                        <div className="text-sm text-gray-400">Judges</div>
+                        <div className="font-medium">{judges?.length || 0}</div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              )}
+            </Card>
+
+            {/* Gladiator List */}
+            <Card className="bg-[#1C2128] border-0">
+              <div 
+                className="p-6 cursor-pointer flex justify-between items-center"
+                onClick={() => toggleCard('gladiators')}
+              >
                 <div className="text-sm text-gray-400">GLADIATOR</div>
-                <div className="text-sm text-gray-400">% CHANCE ↻</div>
+                <div className="flex items-center gap-2">
+                  <div className="text-sm text-gray-400">% CHANCE ↻</div>
+                  <ChevronDown className={`w-5 h-5 transition-transform ${expandedCards.gladiators ? 'rotate-0' : '-rotate-90'}`} />
+                </div>
               </div>
-              <div className="space-y-4">
-                {gladiators?.map((gladiator, index) => {
-                  const currentPrice = Number(gladiatorPrices?.[index] || 0n) / Number(BASIS_POINTS);
-                  const volume = gladiatorVolumes ? formatEther(gladiatorVolumes[index]) : '0';
-                  const totalVolumeFormatted = formatEther(totalVolume || 0n);
-                  const volumePercentage = totalVolumeFormatted !== '0'
-                    ? ((Number(volume) / Number(totalVolumeFormatted)) * 100).toFixed(1)
-                    : '0';
-                  
-                  // Calculate implied probability based on volume
-                  const impliedProbability = totalVolumeFormatted !== '0'
-                    ? ((Number(volume) / Number(totalVolumeFormatted)) * 100).toFixed(1)
-                    : currentPrice.toFixed(1);
-                  
-                  // Calculate prices based on probability
-                  const yesPrice = (Number(impliedProbability) / 100).toFixed(2);
-                  const noPrice = (1 - Number(impliedProbability) / 100).toFixed(2);
-                  
-                  return (
-                    <div key={gladiator.index.toString()} className="border-t border-gray-800 pt-4">
-                      <div className="flex justify-between items-start mb-2">
-                        <div>
-                          <div className="font-medium">{gladiator.name}</div>
-                          <div className="text-sm text-gray-400">
-                            ${volume} Vol. ({volumePercentage}%)
+              {expandedCards.gladiators && (
+                <CardContent className="pt-0">
+                  <div className="flex justify-between items-center mb-4">
+                    <div className="text-sm text-gray-400">GLADIATOR</div>
+                    <div className="text-sm text-gray-400">% CHANCE ↻</div>
+                  </div>
+                  <div className="space-y-4">
+                    {gladiators?.map((gladiator, index) => {
+                      const currentPrice = Number(gladiatorPrices?.[index] || 0n) / Number(BASIS_POINTS);
+                      const volume = gladiatorVolumes ? formatEther(gladiatorVolumes[index]) : '0';
+                      const totalVolumeFormatted = formatEther(totalVolume || 0n);
+                      const volumePercentage = totalVolumeFormatted !== '0'
+                        ? ((Number(volume) / Number(totalVolumeFormatted)) * 100).toFixed(1)
+                        : '0';
+                      
+                      // Calculate implied probability based on volume
+                      const impliedProbability = totalVolumeFormatted !== '0'
+                        ? ((Number(volume) / Number(totalVolumeFormatted)) * 100).toFixed(1)
+                        : currentPrice.toFixed(1);
+                      
+                      // Calculate prices based on probability
+                      const yesPrice = (Number(impliedProbability) / 100).toFixed(2);
+                      const noPrice = (1 - Number(impliedProbability) / 100).toFixed(2);
+                      
+                      return (
+                        <div key={gladiator.index.toString()} className="border-t border-gray-800 pt-4">
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <div className="font-medium">{gladiator.name}</div>
+                              <div className="text-sm text-gray-400">
+                                ${volume} Vol. ({volumePercentage}%)
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-xl font-medium">{impliedProbability}%</div>
+                              <div className="text-sm text-gray-400">
+                                Implied Probability
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button 
+                              variant="outline" 
+                              className="flex-1 bg-[#1F3229] text-[#3FB950] border-[#238636] hover:bg-[#238636] hover:text-white"
+                              onClick={() => {
+                                setSelectedGladiator(gladiator);
+                                setOrderType('buy');
+                                setAmount('1');
+                                handleAmountChange('1');
+                              }}
+                              disabled={!isConnected}
+                            >
+                              {`Buy Yes ${yesPrice}¢`}
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              className="flex-1 bg-[#3B2325] text-[#F85149] border-[#F85149] hover:bg-[#F85149] hover:text-white"
+                              onClick={() => {
+                                setSelectedGladiator(gladiator);
+                                setOrderType('sell');
+                                setAmount('1');
+                                handleAmountChange('1');
+                              }}
+                              disabled={!isConnected}
+                            >
+                              {`Buy No ${noPrice}¢`}
+                            </Button>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <div className="text-xl font-medium">{impliedProbability}%</div>
-                          <div className="text-sm text-gray-400">
-                            Implied Probability
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button 
-                          variant="outline" 
-                          className="flex-1 bg-[#1F3229] text-[#3FB950] border-[#238636] hover:bg-[#238636] hover:text-white"
-                          onClick={() => {
-                            setSelectedGladiator(gladiator);
-                            setOrderType('buy');
-                            setAmount('1');
-                            handleAmountChange('1');
-                          }}
-                          disabled={!isConnected}
-                        >
-                          {`Buy Yes ${yesPrice}¢`}
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          className="flex-1 bg-[#3B2325] text-[#F85149] border-[#F85149] hover:bg-[#F85149] hover:text-white"
-                          onClick={() => {
-                            setSelectedGladiator(gladiator);
-                            setOrderType('sell');
-                            setAmount('1');
-                            handleAmountChange('1');
-                          }}
-                          disabled={!isConnected}
-                        >
-                          {`Buy No ${noPrice}¢`}
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          )}
-        </Card>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              )}
+            </Card>
+          </>
+        )}
       </div>
 
       {/* Side Panel */}
