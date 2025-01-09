@@ -4,8 +4,8 @@
     "module": "commonjs",
     "lib": ["es2020"],
     "outDir": "./dist",
-    "rootDir": "../src",
-    "strict": true,
+    "rootDir": "./src",
+    "strict": false,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
@@ -13,6 +13,6 @@
     "resolveJsonModule": true,
     "isolatedModules": true
   },
-  "include": ["../src/**/*"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "**/*.test.ts"]
 } 

@@ -122,14 +122,6 @@ type GladiatorPrices = { [index: string]: bigint };
 type GladiatorVolumes = { [index: string]: bigint };
 type UserPositions = { [index: string]: bigint };
 
-// Add new types for chat messages
-type ChatMessage = {
-  gladiatorName: string;
-  content: string;
-  timestamp: string;
-  gladiatorIndex: number;
-};
-
 interface DebateViewProps {
   debateId: number;
 }
@@ -364,45 +356,6 @@ export function DebateView({ debateId }: DebateViewProps) {
   const daysRemaining = Math.floor(timeRemaining / (24 * 60 * 60));
   const hoursRemaining = Math.floor((timeRemaining % (24 * 60 * 60)) / 3600);
 
-    // Add state for chat messages
-    const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-    const [isLoadingChat, setIsLoadingChat] = useState(false);
-    const [chatError, setChatError] = useState<string | null>(null);
-  
-    // Add function to fetch chat messages
-    const fetchChatMessages = async () => {
-      if (!marketId) return;
-      
-      try {
-        setIsLoadingChat(true);
-        setChatError(null);
-        const response = await fetch(`http://localhost:3000/api/chat/${marketId}`);
-        if (!response.ok) {
-          throw new Error('Failed to fetch chat messages');
-        }
-        const data = await response.json();
-        setChatMessages(data);
-      } catch (error) {
-        console.error('Error fetching chat:', error);
-        setChatError('Failed to load chat messages');
-      } finally {
-        setIsLoadingChat(false);
-      }
-    };
-  
-    // Add effect to fetch chat messages periodically when bonding curve is fulfilled
-    useEffect(() => {
-      if (!bondingCurve?.isFulfilled) return;
-  
-      // Fetch initially
-      fetchChatMessages();
-  
-      // Set up polling every 10 seconds
-      const interval = setInterval(fetchChatMessages, 10000);
-  
-      return () => clearInterval(interval);
-    }, [marketId, bondingCurve?.isFulfilled]);
-  
 
 
   const handleApproveToken = async (amountInWei: bigint) => {
@@ -502,8 +455,8 @@ export function DebateView({ debateId }: DebateViewProps) {
     const numValue = parseFloat(value) || 0;
     setAmount(value);
     // Calculate potential return based on current price
-    if (selectedGladiator && outcomePrices) {
-      const price = Number(outcomePrices[Number(selectedGladiator.index)]) / 100;
+    if (selectedGladiator && gladiatorPrices) {
+      const price = Number(gladiatorPrices[Number(selectedGladiator.index)]) / 100;
       const return_value = orderType === 'buy' 
         ? numValue * (100 / price - 1)
         : numValue * (100 / (100 - price) - 1);
@@ -553,46 +506,35 @@ export function DebateView({ debateId }: DebateViewProps) {
           {expandedCards.aiDiscussion && (
             <CardContent className="pt-0">
               {bondingCurve?.isFulfilled ? (
+                // Show AI discussion when bonding curve is fulfilled
                 <div className="space-y-4 max-h-[300px] overflow-y-auto">
-                  {isLoadingChat && chatMessages.length === 0 && (
-                    <div className="flex justify-center items-center py-4">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-500"></div>
-                    </div>
-                  )}
-                  
-                  {chatError && (
-                    <div className="text-center text-red-400 py-4">
-                      {chatError}
-                    </div>
-                  )}
-
-                  {chatMessages.map((message, index) => (
-                    <div key={index} className="flex gap-3">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white
-                        ${message.gladiatorIndex === 0 ? 'bg-blue-500' : 
-                          message.gladiatorIndex === 1 ? 'bg-green-500' : 
-                          message.gladiatorIndex === 2 ? 'bg-purple-500' : 
-                          message.gladiatorIndex === 3 ? 'bg-yellow-500' : 
-                          'bg-red-500'}`}>
-                        {message.gladiatorName.charAt(0)}
-                      </div>
-                      <div className="flex-1">
-                        <div className="bg-[#2D333B] rounded-lg p-3">
-                          <div className="text-sm font-medium mb-1">{message.gladiatorName}</div>
-                          <p className="text-sm text-gray-300">{message.content}</p>
-                          <div className="text-xs text-gray-500 mt-2">
-                            {new Date(message.timestamp).toLocaleTimeString()}
-                          </div>
-                        </div>
+                  <div className="flex gap-3">
+                    <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white">A1</div>
+                    <div className="flex-1">
+                      <div className="bg-[#2D333B] rounded-lg p-3">
+                        <div className="text-sm font-medium mb-1">Agent Alpha</div>
+                        <p className="text-sm text-gray-300">Based on recent market data, I believe the probability of a 75bps decrease is undervalued. The current implied probability of 32% seems low given recent economic indicators.</p>
                       </div>
                     </div>
-                  ))}
-
-                  {chatMessages.length === 0 && !isLoadingChat && !chatError && (
-                    <div className="text-center text-gray-400 py-4">
-                      No messages yet
+                  </div>
+                  <div className="flex gap-3">
+                    <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-white">A2</div>
+                    <div className="flex-1">
+                      <div className="bg-[#2D333B] rounded-lg p-3">
+                        <div className="text-sm font-medium mb-1">Agent Beta</div>
+                        <p className="text-sm text-gray-300">I disagree. The market is correctly pricing in the likelihood. Historical patterns suggest that such aggressive cuts are rare without clear recessionary signals.</p>
+                      </div>
                     </div>
-                  )}
+                  </div>
+                  <div className="flex gap-3">
+                    <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center text-white">A3</div>
+                    <div className="flex-1">
+                      <div className="bg-[#2D333B] rounded-lg p-3">
+                        <div className="text-sm font-medium mb-1">Agent Gamma</div>
+                        <p className="text-sm text-gray-300">Interesting perspectives. Let's consider the latest PMI data and its correlation with previous rate decisions. The trend suggests a more moderate approach.</p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 // Show teaser when bonding curve is not fulfilled

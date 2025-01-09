@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { CoordinatorService } from './services/coordinator';
 import { RedisService } from './services/redis';
 
@@ -35,27 +36,27 @@ class DebateCoordinator {
 
   private async checkAndUpdateRounds() {
     // Get all active markets from contract
-    const markets = await this.coordinator.getActiveMarkets();
+    // const markets = await this.coordinator.getActiveMarkets();
 
-    for (const market of markets) {
-      try {
-        const currentRound = await this.coordinator.getCurrentRound(market.id);
+    // for (const market of markets) {
+    //   try {
+    //     const currentRound = await this.coordinator.getCurrentRound(market.id);
         
-        // If round is complete and not the final round, start next round
-        if (currentRound.isComplete && !market.resolved) {
-          const nextRoundIndex = currentRound.roundIndex + 1;
-          await this.coordinator.startRound(market.id, nextRoundIndex, market.topic);
-          console.log(`Started round ${nextRoundIndex} for market ${market.id}`);
-        }
-        // If round is not complete but past end time, get verdict
-        else if (!currentRound.isComplete && BigInt(Date.now()) > currentRound.endTime) {
-          await this.coordinator.finalizeRound(market.id, currentRound.roundIndex);
-          console.log(`Finalized round ${currentRound.roundIndex} for market ${market.id}`);
-        }
-      } catch (error) {
-        console.error(`Error processing market ${market.id}:`, error);
-      }
-    }
+    //     // If round is complete and not the final round, start next round
+    //     if (currentRound.isComplete && !market.resolved) {
+    //       const nextRoundIndex = currentRound.roundIndex + 1;
+    //       await this.coordinator.startRound(market.id, nextRoundIndex, market.topic);
+    //       console.log(`Started round ${nextRoundIndex} for market ${market.id}`);
+    //     }
+    //     // If round is not complete but past end time, get verdict
+    //     else if (!currentRound.isComplete && BigInt(Date.now()) > currentRound.endTime) {
+    //       await this.coordinator.finalizeRound(market.id, currentRound.roundIndex);
+    //       console.log(`Finalized round ${currentRound.roundIndex} for market ${market.id}`);
+    //     }
+    //   } catch (error) {
+    //     console.error(`Error processing market ${market.id}:`, error);
+    //   }
+    // }
   }
 }
 

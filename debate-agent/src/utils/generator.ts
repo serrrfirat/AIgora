@@ -1,5 +1,5 @@
-import { convertToOneLine, replaceAgentValues, lc, createOrUpdateJsonFile, AgentData, defaultTwitterTemplate } from './helpers.ts';
-import { systemPrompt } from './prompts.ts';
+import { convertToOneLine, replaceAgentValues, lc, createOrUpdateJsonFile, AgentData, defaultTwitterTemplate } from './helpers';
+import { systemPrompt } from './prompts';
 
 /** Creates or updates the JSON file for a gladiator.
  *
