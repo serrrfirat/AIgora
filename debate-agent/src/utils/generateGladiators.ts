@@ -1,4 +1,4 @@
-import { generateOrUpdateGladiatorData } from "./utils/generator.ts";
+import { generateOrUpdateGladiatorData } from "./generator.ts";
 
 generateOrUpdateGladiatorData("Spartacus", "a debating gladiator with a passion for rethoric", "passionate, enthusiastic, and creative");
 generateOrUpdateGladiatorData("Crixus", "a debating gladiator with a likeable personality", "rebel, astute, and sharp");

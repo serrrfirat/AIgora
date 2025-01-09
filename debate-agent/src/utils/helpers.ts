@@ -1,6 +1,6 @@
 import fs from 'fs';
 import { continueMessageHandlerTemplate, evaluationTemplate, factsTemplate, goalsTemplate, shouldRespondTemplate, twitterActionTemplate, twitterMessageHandlerTemplate, twitterPostTemplate, twitterSearchTemplate, twitterShouldRespondTemplate } from './templates.ts';
-import { messageHandlerTemplate } from '@ai16z/client-direct';
+import { messageHandlerTemplate } from '@elizaos/client-direct';
 
 /**
  * Template interface for what's needed for the Twitter agent.
