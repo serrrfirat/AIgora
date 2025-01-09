@@ -8,23 +8,37 @@ import { TwitterApi } from 'twitter-api-v2';
 import { ChatService } from './chat';
 import { AgentClient } from './agent-client';
 import { Scraper } from 'agent-twitter-client';
+import { WebSocketServer, WebSocket } from 'ws';
+import { Message } from '../types/message';
+import { Redis } from 'ioredis';
 
 export class CoordinatorService {
-  private redis: RedisService;
+  private redis: Redis;
   private publicClient;
   private wsClient;
   private scraper: Scraper;
   private chatService: ChatService;
   private agentClient: AgentClient;
+  private wss: WebSocketServer;
+  private chatConnections: Map<string, Set<WebSocket>>;
 
   constructor() {
     if (!process.env.RPC_URL) throw new Error('RPC_URL environment variable is not set');
     if (!process.env.WSS_RPC_URL) throw new Error('WSS_RPC_URL environment variable is not set');
 
-    this.redis = new RedisService();
+    this.redis = new Redis({
+      host: 'localhost',
+      port: 6379,
+      lazyConnect: true  // Don't connect immediately
+    });
     this.agentClient = new AgentClient();
-    this.chatService = new ChatService(this.redis, this.agentClient);
-    this.scraper = new Scraper();
+    this.wss = new WebSocketServer({ port: 3001 });
+    this.chatConnections = new Map();
+    this.chatService = new ChatService(
+      this.redis, 
+      this.agentClient,
+      this.broadcastChatMessage.bind(this)
+    );
 
     // Initialize WebSocket client for event listening
     this.wsClient = createPublicClient({
@@ -37,25 +51,57 @@ export class CoordinatorService {
       chain: holesky,
       transport: http(process.env.RPC_URL)
     });
+
+    // Set up WebSocket connection handler
+    this.wss.on('connection', (ws: WebSocket, req: any) => {
+      const marketId = req.url?.split('/').pop();
+      if (!marketId) {
+        ws.close();
+        return;
+      }
+
+      // Add to connections for this market
+      if (!this.chatConnections.has(marketId)) {
+        this.chatConnections.set(marketId, new Set());
+      }
+      this.chatConnections.get(marketId)?.add(ws);
+
+      // Handle client disconnect
+      ws.on('close', () => {
+        this.chatConnections.get(marketId)?.delete(ws);
+        if (this.chatConnections.get(marketId)?.size === 0) {
+          this.chatConnections.delete(marketId);
+        }
+      });
+    });
   }
 
   async initialize() {
-    await this.redis.connect();
-    await this.scraper.login(process.env.TWITTER_USERNAME!, process.env.TWITTER_PASSWORD!)
-    // await this.handleBondingComplete(BigInt(5))
-    await this.startEventListening();
-    await this.startListeningRounds();
+    try {
+      // Connect to Redis only if not already connected
+      if (!this.redis.status || this.redis.status === 'wait') {
+        await this.redis.connect();
+      }
+      // await this.scraper.login(process.env.TWITTER_USERNAME!, process.env.TWITTER_PASSWORD!)
+      // await this.handleBondingComplete(BigInt(5))
+      await this.startEventListening();
+      await this.startListeningRounds();
 
-    // Register agent servers from environment variables
-    const agentServers = process.env.AGENT_SERVERS ? JSON.parse(process.env.AGENT_SERVERS) : {};
-    for (const [agentId, url] of Object.entries(agentServers)) {
-      this.agentClient.registerAgent(agentId, url as string);
+      // Register agent servers from environment variables
+      const agentServers = process.env.AGENT_SERVERS ? JSON.parse(process.env.AGENT_SERVERS) : {};
+      for (const [agentId, url] of Object.entries(agentServers)) {
+        this.agentClient.registerAgent(agentId, url as string);
+      }
+    } catch (error) {
+      console.error('Error during initialization:', error);
+      throw error;
     }
   }
 
   async cleanup() {
     await this.redis.disconnect();
     await this.wsClient.destroy();
+    await new Promise<void>((resolve) => this.wss.close(() => resolve()));
   }
 
   // Chat room management functions
@@ -130,7 +176,6 @@ export class CoordinatorService {
   // Keep existing event listening and handling functions
   private async startEventListening() {
     console.log('Starting event listening...');
-
     // Listen for BondingComplete events
     const unwatch = await this.wsClient.watchContractEvent({
       address: MARKET_FACTORY_ADDRESS,
@@ -142,7 +187,11 @@ export class CoordinatorService {
           if (!marketId) continue;
 
           console.log(`Bonding complete for market ${marketId}`);
-          await this.handleBondingComplete(marketId);
+          const market = await this.getMarketDetails(marketId);
+          // await this.handleBondingComplete(marketId);
+          // Create chat room if it doesn't exist and start discussion
+          await this.createDebateChatRoom(market.debateId);
+          await this.startDebateDiscussion(market.debateId);
         }
       },
     });
@@ -167,9 +216,8 @@ export class CoordinatorService {
           const market = await this.getMarketDetails(marketId);
           if (!market) continue;
 
-          // Create chat room if it doesn't exist and start discussion
-          await this.createDebateChatRoom(market.debateId);
-          await this.startDebateDiscussion(market.debateId);
+          // Round complete, send the message to Marcus AIrelius
+          await this.handleRoundEnded(marketId, roundIndex);
         }
       },
     });
@@ -240,7 +288,7 @@ export class CoordinatorService {
       return;
     }
     /// Call Marcus AIrelius to the thread
-    const marcusRequest = await this.scraper.sendTweet(`Marcus AIrelius, the judge, please deliver the verdict of this round. The topic is "${debate.topic}" and the gladiators are ${gladiators.map(g => g.name).join(', ')}. The timestamp is ${round.round.endTime}`);
+    const marcusRequest = await this.scraper.sendTweet(`Marcus AIrelius, the judge, please deliver the verdict of this round. The topic is "${debate.topic}" and the gladiators are ${gladiators.map(g => g.name).join(', ')}. The timestamp is ${round.endTime}`);
     } catch (error) {
       console.error('Error handling round ended:', error);
     }
@@ -423,6 +471,36 @@ export class CoordinatorService {
       }));
     } catch (error) {
       console.error('Error getting gladiators:', error);
+      return [];
+    }
+  }
+
+  // Add method to broadcast chat messages
+  private broadcastChatMessage(marketId: string, message: Message) {
+    const connections = this.chatConnections.get(marketId);
+    if (connections) {
+      const messageStr = JSON.stringify(message);
+      connections.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(messageStr);
+        }
+      });
+    }
+  }
+
+  // Add method to get chat messages
+  async getChatMessages(marketId: bigint): Promise<Message[]> {
+    try {
+      // Get debate ID from market ID
+      const market = await this.getMarketDetails(marketId);
+      if (!market) {
+        throw new Error(`No market found for ID ${marketId}`);
+      }
+
+      // Get messages from chat service
+      return await this.chatService.getMessages(market.debateId);
+    } catch (error) {
+      console.error('Error getting chat messages:', error);
       return [];
     }
   }

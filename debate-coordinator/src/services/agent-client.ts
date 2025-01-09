@@ -24,25 +24,22 @@ export class AgentClient {
     if (!agent) throw new Error(`Agent ${agentId} not found`);
 
     try {
+      const formData = new FormData();
+      formData.append("text", message.text);
+      formData.append("userId", message.userId);
+      formData.append("roomId", `${message.roomId}`);
+
       const response = await fetch(`${agent.url}/${agentId}/message`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          roomId: message.roomId,
-          userId: message.userId,
-          text: message.text,
-          userName: message.userName || 'User'
-        })
+        body: formData
       });
 
       if (!response.ok) {
         throw new Error(`Failed to send message to agent ${agentId}: ${response.statusText}`);
       }
 
-      const responses = await response.json();
-      return responses[0]?.content?.text || ''; // Get first response's text
+      const data = await response.json();
+      return Array.isArray(data) ? data[0]?.text || '' : '';
     } catch (error) {
       console.error(`Error communicating with agent ${agentId}:`, error);
       throw error;

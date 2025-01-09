@@ -1,65 +1,38 @@
 import 'dotenv/config';
+import express from 'express';
+import cors from 'cors';
 import { CoordinatorService } from './services/coordinator';
-import { RedisService } from './services/redis';
 
-const POLL_INTERVAL = 60 * 1000; // 1 minute
+const app = express();
+const port = process.env.PORT || 3003;
 
-class DebateCoordinator {
-  private coordinator: CoordinatorService;
-  private redis: RedisService;
+// Enable CORS
+app.use(cors());
+app.use(express.json());
 
-  constructor() {
-    this.coordinator = new CoordinatorService();
-    this.redis = new RedisService();
+const coordinator = new CoordinatorService();
+
+// Initialize coordinator service
+coordinator.initialize().catch(console.error);
+
+// Add chat endpoint
+app.get('/api/chat/:marketId', async (req, res) => {
+  try {
+    const marketId = BigInt(req.params.marketId);
+    const messages = await coordinator.getChatMessages(marketId);
+    res.json(messages);
+  } catch (error) {
+    console.error('Error getting chat messages:', error);
+    res.status(500).json({ error: 'Failed to get chat messages' });
   }
+});
 
-  async initialize() {
-    try {
-      await this.coordinator.initialize();
-      console.log('Coordinator service initialized');
-      this.startPolling();
-    } catch (error) {
-      console.error('Failed to initialize services:', error);
-      process.exit(1);
-    }
-  }
+app.listen(port, () => {
+  console.log(`Coordinator service listening at http://localhost:${port}`);
+});
 
-  private startPolling() {
-    setInterval(async () => {
-      try {
-        await this.checkAndUpdateRounds();
-      } catch (error) {
-        console.error('Error in polling cycle:', error);
-      }
-    }, POLL_INTERVAL);
-  }
-
-  private async checkAndUpdateRounds() {
-    // Get all active markets from contract
-    // const markets = await this.coordinator.getActiveMarkets();
-
-    // for (const market of markets) {
-    //   try {
-    //     const currentRound = await this.coordinator.getCurrentRound(market.id);
-        
-    //     // If round is complete and not the final round, start next round
-    //     if (currentRound.isComplete && !market.resolved) {
-    //       const nextRoundIndex = currentRound.roundIndex + 1;
-    //       await this.coordinator.startRound(market.id, nextRoundIndex, market.topic);
-    //       console.log(`Started round ${nextRoundIndex} for market ${market.id}`);
-    //     }
-    //     // If round is not complete but past end time, get verdict
-    //     else if (!currentRound.isComplete && BigInt(Date.now()) > currentRound.endTime) {
-    //       await this.coordinator.finalizeRound(market.id, currentRound.roundIndex);
-    //       console.log(`Finalized round ${currentRound.roundIndex} for market ${market.id}`);
-    //     }
-    //   } catch (error) {
-    //     console.error(`Error processing market ${market.id}:`, error);
-    //   }
-    // }
-  }
-}
-
-// Start the coordinator
-const coordinator = new DebateCoordinator();
-coordinator.initialize(); 
+// Handle cleanup on shutdown
+process.on('SIGTERM', async () => {
+  await coordinator.cleanup();
+  process.exit(0);
+}); 

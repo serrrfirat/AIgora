@@ -3,7 +3,7 @@ import { Market, Round, Gladiator } from '../types/market';
 import { AgentMessage, JudgeVerdict } from '../types/agent';
 
 export class RedisService {
-  public client;
+  private client;
 
   constructor() {
     this.client = createClient({

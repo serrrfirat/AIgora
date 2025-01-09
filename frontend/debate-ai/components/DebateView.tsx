@@ -15,6 +15,12 @@ import { ChevronDown } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { BribeSubmission } from './BribeSubmission';
 
+interface Message {
+  sender: string;
+  content: string;
+  timestamp: string;
+}
+
 // Constants from the contract
 const BASIS_POINTS = 10000n;
 const MIN_PRICE = 1n; // $0.01 in basis points
@@ -137,6 +143,7 @@ export function DebateView({ debateId }: DebateViewProps) {
   const [selectedGladiator, setSelectedGladiator] = useState<Gladiator | null>(null);
   const [amount, setAmount] = useState<string>('0');
   const [potentialReturn, setPotentialReturn] = useState<string>('0.00');
+  const [chatMessages, setChatMessages] = useState<Message[]>([]);
 
   // Transaction state
   const { 
@@ -159,6 +166,8 @@ export function DebateView({ debateId }: DebateViewProps) {
     hash: orderHash,
   });
 
+
+  
   // Effect for handling order confirmation
   useEffect(() => {
     if (isOrderConfirmed) {
@@ -188,6 +197,7 @@ export function DebateView({ debateId }: DebateViewProps) {
       [cardName]: !prev[cardName]
     }));
   };
+
 
   /// Get Debate Details
   const { data: debateDetails, refetch: refetchDebateDetails } = useReadContract({
@@ -294,6 +304,40 @@ export function DebateView({ debateId }: DebateViewProps) {
     functionName: 'allowance',
     args: address && marketDetails ? [address, MARKET_FACTORY_ADDRESS] : undefined,
   });
+
+    // Add state for chat messages
+
+  // Effect to fetch and subscribe to chat messages
+  useEffect(() => {
+    console.log("marketId", marketId);
+    if (!marketId) return;
+
+    const fetchMessages = async () => {
+      try {
+        const response = await fetch(`/api/chat/${marketId}`);
+        const messages = await response.json();
+        console.log("messages", messages);
+        setChatMessages(messages);
+      } catch (error) {
+        console.error('Error fetching chat messages:', error);
+      }
+    };
+
+    // Initial fetch
+    fetchMessages();
+
+    // Set up WebSocket connection
+    const ws = new WebSocket(`${process.env.NEXT_PUBLIC_WS_URL}/chat/${marketId}`);
+    
+    ws.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+      setChatMessages(prev => [...prev, message]);
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, [marketId]);
 
   // Function to refetch all data
   const refetchAllData = async () => {
@@ -506,38 +550,22 @@ export function DebateView({ debateId }: DebateViewProps) {
           {expandedCards.aiDiscussion && (
             <CardContent className="pt-0">
               {bondingCurve?.isFulfilled ? (
-                // Show AI discussion when bonding curve is fulfilled
                 <div className="space-y-4 max-h-[300px] overflow-y-auto">
-                  <div className="flex gap-3">
-                    <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white">A1</div>
-                    <div className="flex-1">
-                      <div className="bg-[#2D333B] rounded-lg p-3">
-                        <div className="text-sm font-medium mb-1">Agent Alpha</div>
-                        <p className="text-sm text-gray-300">Based on recent market data, I believe the probability of a 75bps decrease is undervalued. The current implied probability of 32% seems low given recent economic indicators.</p>
+                  {chatMessages.map((message, index) => (
+                    <div key={index} className="flex gap-3">
+                      <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white">
+                        {message.sender.charAt(0)}
+                      </div>
+                      <div className="flex-1">
+                        <div className="bg-[#2D333B] rounded-lg p-3">
+                          <div className="text-sm font-medium mb-1">{message.sender}</div>
+                          <p className="text-sm text-gray-300">{message.content}</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="flex gap-3">
-                    <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-white">A2</div>
-                    <div className="flex-1">
-                      <div className="bg-[#2D333B] rounded-lg p-3">
-                        <div className="text-sm font-medium mb-1">Agent Beta</div>
-                        <p className="text-sm text-gray-300">I disagree. The market is correctly pricing in the likelihood. Historical patterns suggest that such aggressive cuts are rare without clear recessionary signals.</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex gap-3">
-                    <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center text-white">A3</div>
-                    <div className="flex-1">
-                      <div className="bg-[#2D333B] rounded-lg p-3">
-                        <div className="text-sm font-medium mb-1">Agent Gamma</div>
-                        <p className="text-sm text-gray-300">Interesting perspectives. Let's consider the latest PMI data and its correlation with previous rate decisions. The trend suggests a more moderate approach.</p>
-                      </div>
-                    </div>
-                  </div>
+                  ))}
                 </div>
               ) : (
-                // Show teaser when bonding curve is not fulfilled
                 <div className="flex flex-col items-center justify-center py-8 space-y-4">
                   <div className="w-16 h-16 bg-[#2D333B] rounded-full flex items-center justify-center">
                     <div className="text-2xl">🤖</div>
