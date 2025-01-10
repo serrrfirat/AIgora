@@ -1,0 +1,33 @@
+{
+  "name": "x_scraper",
+  "version": "1.0.0",
+  "main": "",
+  "type": "module",
+  "scripts": {
+    "twitter": "node src/twitter/index.js",
+    "character": "node src/character/GenerateCharacter.js"
+  },
+  "keywords": [],
+  "author": "nuff",
+  "license": "MIT",
+  "description": "",
+  "dependencies": {
+    "agent-twitter-client": "^0.0.13",
+    "axios": "^1.7.7",
+    "chalk": "^5.3.0",
+    "cheerio": "^1.0.0",
+    "cli-table3": "^0.6.5",
+    "date-fns": "^4.1.0",
+    "dotenv": "^16.4.5",
+    "fs": "^0.0.1-security",
+    "inquirer": "^12.0.1",
+    "openai": "^4.73.1",
+    "ora": "^8.1.0",
+    "progress": "^2.0.3",
+    "puppeteer-cluster": "^0.24.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-adblocker": "^2.13.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "ua-parser-js": "^2.0.0-rc.1"
+  }
+}
