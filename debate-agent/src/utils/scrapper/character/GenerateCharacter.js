@@ -3,7 +3,7 @@ import path from "path";
 import readline from "readline";
 import { createReadStream } from "fs";
 
-class TweetProcessor {
+export class TweetProcessor {
 	constructor(username, date) {
 		this.username = username.toLowerCase();
 		this.date = date;
