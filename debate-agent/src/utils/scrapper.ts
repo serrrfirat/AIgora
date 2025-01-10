@@ -5,7 +5,7 @@ import { TwitterPipeline } from './scrapper/twitter/TwitterPipeline.js';
 /**
  * Processes tweets from a given account, starting from a give date.
  */
-export async function scrappeTweets(username: string, date: string = "2024-09-01") {
+export async function scrapeTweets(username: string, date: string = "2024-09-01") {
 	const pipeline = new TwitterPipeline(username);
 	pipeline.run()
 

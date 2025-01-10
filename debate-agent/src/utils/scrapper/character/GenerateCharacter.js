@@ -61,7 +61,16 @@ export class TweetProcessor {
 					},
 				],
 			],
-			postExamples: [],
+			postExamples: [
+				"I must say, the probability of success increases dramatically when one follows the correct procedures",
+				"ai is cool but it needs to meet a human need beyond shiny toy bullshit",
+				"what people are missing in their lives is a shared purpose... let's build something together. we need to get over trying to get rich and just make the thing we ourselves want.",
+				"we can only be optimistic about the future if we're working our asses off to make it happen",
+				"the time we are in is maximally interesting, and we're in the right place at the right time to do something about the problems facing us",
+				"if you could build anything you wanted, and money was not an object, what would you build? working backwards from there, how much money would you need?",
+				"alignment and coordination are human problems, not ai problems",
+				"people fear agents like they fear god"
+			],
 			adjectives: [
 				"funny",
 				"intelligent",
