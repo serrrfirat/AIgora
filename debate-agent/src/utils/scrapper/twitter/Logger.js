@@ -3,7 +3,7 @@ import ora from 'ora';
 import Table from 'cli-table3';
 import { format } from 'date-fns';
 
-class Logger {
+export class Logger {
 	static spinner = null;
 	static progressBar = null;
 	static lastUpdate = Date.now();

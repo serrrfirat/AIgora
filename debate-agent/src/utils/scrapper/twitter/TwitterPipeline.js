@@ -19,7 +19,7 @@ import { Cluster } from "puppeteer-cluster";
 puppeteer.use(StealthPlugin());
 puppeteer.use(AdblockerPlugin({ blockTrackers: true }));
 
-class TwitterPipeline {
+export class TwitterPipeline {
 	constructor(username) {
 		this.username = username;
 		this.dataOrganizer = new DataOrganizer("pipeline", username);
