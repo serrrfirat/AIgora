@@ -67,7 +67,7 @@ export function DebateList() {
   const hasMore = debateIds ? visibleItems < debateIds.length : false;
 
   return (
-    <div className="space-y-8 p-4 w-full flex flex-col items-center">
+    <div className="space-y-8 p-4 w-full flex flex-col items-center pixelated-2">
       <div className="grid w-[80vw] grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {visibleDebates.map((debateId, index) => {
           const details = debateDetails?.[index]?.result as
@@ -127,7 +127,7 @@ export function DebateList() {
                     <Activity className="w-4 h-4 text-[#298080]" />
                     <div className="flex items-center gap-2">
                       {isActive && (
-                        <div className="w-2 h-2 rounded-full bg-green-500 status-dot" />
+                        <div className="w-2 h-2 rounded-full bg-green-500 status-dot animate-blink" />
                       )}
                       <span
                         className={`text-sm ${
