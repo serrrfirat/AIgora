@@ -67,8 +67,8 @@ export function DebateList() {
   const hasMore = debateIds ? visibleItems < debateIds.length : false;
 
   return (
-    <div className="space-y-8 p-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div className="space-y-8 p-4 w-full flex flex-col items-center">
+      <div className="grid w-[80vw] grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {visibleDebates.map((debateId, index) => {
           const details = debateDetails?.[index]?.result as
             | DebateDetails

@@ -2,7 +2,7 @@ import "../app/globals.css";
 
 function Loader() {
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center">
+    <div className="min-h-screen bg-[#212936] flex items-center justify-center">
       <div className="relative">
         {/* Loader Container */}
         <div className="grid grid-cols-3 gap-1 p-4">
