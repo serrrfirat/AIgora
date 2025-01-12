@@ -131,6 +131,15 @@ interface DebateViewProps {
   debateId: number;
 }
 
+// Add sorting function after Message interface
+function sortMessagesByTimestamp(messages: Message[]): Message[] {
+  return [...messages].sort((a, b) => {
+    const timeA = new Date(a.timestamp).getTime();
+    const timeB = new Date(b.timestamp).getTime();
+    return timeB - timeA; // Sort in descending order (newest first)
+  });
+}
+
 export function DebateView({ debateId }: DebateViewProps) {
   const { isConnected, address } = useAccount();
   const publicClient = useClient({ config });
@@ -333,10 +342,8 @@ export function DebateView({ debateId }: DebateViewProps) {
             'Cache-Control': 'no-cache, no-store, must-revalidate',
             'Pragma': 'no-cache',
             'Expires': '0',
-            // Add a timestamp to force unique requests
             'X-Request-Time': Date.now().toString()
           },
-          // Disable caching at fetch level
           cache: 'no-store',
           next: { revalidate: 0 }
         });
@@ -350,7 +357,7 @@ export function DebateView({ debateId }: DebateViewProps) {
           return;
         }
         console.log("[DebateView] Received messages:", messages);
-        setChatMessages(messages);
+        setChatMessages(sortMessagesByTimestamp(messages));
       } catch (error) {
         console.error('[DebateView] Error fetching chat messages:', error);
       }
@@ -396,7 +403,7 @@ export function DebateView({ debateId }: DebateViewProps) {
         console.log("[DebateView] Received WebSocket message:", event.data);
         try {
           const message = JSON.parse(event.data);
-          setChatMessages(prev => [...prev, message]);
+          setChatMessages(prev => sortMessagesByTimestamp([message, ...prev]));
         } catch (error) {
           console.error("[DebateView] Error parsing WebSocket message:", error);
         }
