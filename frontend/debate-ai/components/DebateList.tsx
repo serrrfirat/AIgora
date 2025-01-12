@@ -7,6 +7,7 @@ import { formatAddress } from '@/lib/utils';
 import { Button } from './ui/button';
 import { ChatWindow } from './MiniChatWindow';
 import { type Abi } from 'viem';
+import { Badge } from './ui/badge';
 
 type DebateDetails = [
   string,      // topic
@@ -83,56 +84,88 @@ export function DebateList() {
   const sortedDebates = sortDebatesByStartTime(debates);
 
   return (
-    <div className="space-y-8 p-4">
-      {sortedDebates.map(({ id: debateId, details, marketId }) => {
-        const [
-          topic,
-          startTime,
-          duration,
-          debateEndTime,
-          currentRound,
-          totalRounds,
-          isActive,
-          creator,
-          market,
-          judges,
-          hasOutcome,
-          finalOutcome
-        ] = details;
+    <div className="container mx-auto p-4">
+      {/* Grid layout for debate cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {sortedDebates.map(({ id: debateId, details, marketId }) => {
+          const [
+            topic,
+            startTime,
+            duration,
+            debateEndTime,
+            currentRound,
+            totalRounds,
+            isActive,
+            creator,
+            market,
+            judges,
+            hasOutcome,
+            finalOutcome
+          ] = details;
 
-        return (
-          <Card 
-            key={debateId.toString()} 
-            className="p-4 hover:shadow-lg transition-shadow"
-          >
-            <div className="flex flex-col gap-4">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-semibold">{topic}</h3>
+          return (
+            <Card 
+              key={debateId.toString()} 
+              className="bg-[#1C2128] border-0 overflow-hidden hover:shadow-lg transition-shadow"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between p-4 border-b border-gray-800">
+                <div className="flex items-center space-x-2">
+                  <span className="text-gray-400">#</span>
+                  <h3 className="text-sm font-medium text-gray-300 truncate">
+                    {topic.toLowerCase().replace(/\s+/g, '-')}
+                  </h3>
+                </div>
                 <Button 
-                  variant="outline" 
+                  variant="ghost" 
                   size="sm"
+                  className="text-gray-400 hover:text-white"
                   onClick={() => handleDebateClick(debateId.toString())}
                 >
-                  View Details
+                  <span className="sr-only">Expand</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M7 17l9.2-9.2M17 17V7H7"/>
+                  </svg>
                 </Button>
               </div>
-              <div className="text-sm text-gray-600">
-                <p>Debate ID: #{debateId.toString()}</p>
-                <p>Market ID: #{marketId.toString()}</p>
-                <p>Status: {isActive ? 'Active' : 'Completed'}</p>
-                <p>Current Round: {currentRound.toString()}/{totalRounds.toString()}</p>
-                <p>Created by: {formatAddress(creator)}</p>
-                <p>Number of Judges: {judges.length}</p>
-                {hasOutcome && <p>Final Outcome: {finalOutcome.toString()}</p>}
+
+              {/* Status badges */}
+              <div className="px-4 py-2 flex gap-2 flex-wrap">
+                <Badge variant="secondary" className="bg-[#2D333B] text-gray-300">
+                  Round {currentRound.toString()}/{totalRounds.toString()}
+                </Badge>
+                {isActive ? (
+                  <Badge variant="secondary" className="bg-green-900/30 text-green-400">
+                    Live
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary" className="bg-red-900/30 text-red-400">
+                    Ended
+                  </Badge>
+                )}
+                <Badge variant="secondary" className="bg-[#2D333B] text-gray-300">
+                  {judges.length} judges
+                </Badge>
               </div>
-              {/* Add chat window with fixed height */}
-              <div className="h-[300px] border rounded-lg">
+
+              {/* Chat window */}
+              <div className="h-[300px] border-t border-gray-800">
                 <ChatWindow marketId={marketId} />
               </div>
-            </div>
-          </Card>
-        );
-      })}
+
+              {/* Footer */}
+              <div className="px-4 py-2 border-t border-gray-800 flex items-center justify-between">
+                <div className="text-xs text-gray-400">
+                  Created by {formatAddress(creator)}
+                </div>
+                <div className="text-xs text-gray-400">
+                  ID #{debateId.toString()}
+                </div>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
     </div>
   );
 }
