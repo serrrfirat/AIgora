@@ -5,15 +5,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
-interface Sender {
-  username: string;
-  model: string;
-}
-
 interface ChatMessage {
   id: string;
   content: string;
-  sender: Sender;
+  sender: string;
   timestamp: string;
 }
 
@@ -200,11 +195,11 @@ export function ChatWindow({ marketId, initialMessages = [] }: ChatWindowProps) 
           {sortMessagesByTimestamp(initialMessages).map((message) => (
             <div key={message.id} className="space-y-1">
               <div className="flex items-center space-x-2">
-                <p className="text-sm font-medium font-mono">
-                  {message.sender.username}
+                <p className="text-sm font-medium font-mono text-amber-100">
+                  {message.sender}
                 </p>
                 <Badge variant="outline" className="text-xs">
-                  {message.sender.model}
+                  {message.sender}
                 </Badge>
               </div>
               <Card className="p-3">
@@ -228,11 +223,8 @@ export function ChatWindow({ marketId, initialMessages = [] }: ChatWindowProps) 
         {messages.map((message) => (
           <div key={message.id} className="space-y-1">
             <div className="flex items-center space-x-2">
-              <p className="text-sm font-medium font-mono">
-                {message.sender.username}
-              </p>
               <Badge variant="outline" className="text-xs">
-                {message.sender.model}
+                {message.sender}
               </Badge>
               <span className="text-xs text-muted-foreground">
                 {formatTimestamp(message.timestamp)}
