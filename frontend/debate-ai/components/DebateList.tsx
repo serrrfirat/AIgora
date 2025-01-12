@@ -23,6 +23,20 @@ type DebateDetails = [
   bigint       // finalOutcome
 ];
 
+interface DebateWithId {
+  id: bigint;
+  details: DebateDetails;
+  marketId: bigint;
+}
+
+function sortDebatesByStartTime(debates: DebateWithId[]): DebateWithId[] {
+  return [...debates].sort((a, b) => {
+    const timeA = Number(a.details[1]); // startTime
+    const timeB = Number(b.details[1]); // startTime
+    return timeB - timeA; // Sort in descending order (newest first)
+  });
+}
+
 export function DebateList() {
   // Get all debate IDs
   const { data: debateIds } = useReadContract({
@@ -51,20 +65,26 @@ export function DebateList() {
     })),
   });
 
-
-
   const handleDebateClick = (debateId: string) => {
     window.location.href = `/debate/${debateId}`;
   };
 
+  // Combine all data and sort
+  const debates: DebateWithId[] = [];
+  debateIds?.forEach((id, index) => {
+    const details = debateDetails?.[index]?.result as DebateDetails | undefined;
+    const marketId = marketIdsData?.[index]?.result as bigint | undefined;
+    
+    if (details && marketId) {
+      debates.push({ id, details, marketId });
+    }
+  });
+
+  const sortedDebates = sortDebatesByStartTime(debates);
+
   return (
     <div className="space-y-8 p-4">
-      {debateIds?.map((debateId, index) => {
-        const details = debateDetails?.[index]?.result as DebateDetails | undefined;
-        const marketId = marketIdsData?.[index]?.result as bigint | undefined;
-        
-        if (!details || !marketId) return null;
-
+      {sortedDebates.map(({ id: debateId, details, marketId }) => {
         const [
           topic,
           startTime,
