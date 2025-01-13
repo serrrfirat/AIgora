@@ -2,6 +2,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import TwitterPipeline from './TwitterPipeline.js';
+import { TweetProcessor } from '../character/GenerateCharacter.js';
 import Logger from './Logger.js';
 
 process.on('unhandledRejection', (error) => {
@@ -32,7 +33,11 @@ const cleanup = async () => {
 	process.exit(0);
 };
 
+// clean things up if cancelled
 process.on('SIGINT', cleanup);
 process.on('SIGTERM', cleanup);
 
-pipeline.run().catch(() => process.exit(1));
+const analytics = await pipeline.run().catch((e) => console.error(e));
+
+const processor = new TweetProcessor(username)
+await processor.processTweets().catch((e) => console.error(e));

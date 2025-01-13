@@ -4,13 +4,20 @@ import readline from "readline";
 import { createReadStream } from "fs";
 
 export class TweetProcessor {
-	constructor(username, date) {
+	constructor(username) {
+		const date = new Date();
+		const day = date.getDate();
+		let month = date.getMonth() + 1;
+		month = month < 10 ? `0${month}` : `${month}`
+		const year = date.getFullYear();
+		const currentDate = `${year}-${month}-${day}`;
+
 		this.username = username.toLowerCase();
-		this.date = date;
+		this.date = currentDate;
 		this.baseDir = path.join(
 			"pipeline",
 			username,
-			date
+			currentDate
 		);
 		this.characterFile = path.join("characters", `${username}.json`);
 	}
@@ -158,7 +165,7 @@ export class TweetProcessor {
 
 	async processTweets() {
 		try {
-			console.log(`Processing tweets for ${this.username} from date ${this.date}`);
+			console.log(`Processing tweets for ${this.username}, scrapped on ${this.date}`);
 
 			const tweetsPath = path.join(
 				this.baseDir,
@@ -209,6 +216,7 @@ export class TweetProcessor {
 						text.length >= 20 &&
 						text.length <= 280
 				);
+			console.log("Processed unique tweets")
 
 			// Extract topics
 			const topics = new Set();
@@ -229,6 +237,7 @@ export class TweetProcessor {
 							"about",
 						].includes(word)
 				);
+			console.log("Extracted topics")
 
 			const wordFrequency = {};
 			commonWords.forEach((word) => {
@@ -248,6 +257,7 @@ export class TweetProcessor {
 				JSON.stringify(characterData, null, 2),
 				"utf-8"
 			);
+			console.log("Saved chracter file")
 
 			console.log(`✅ Successfully processed tweets for ${this.username}`);
 			console.log(`📝 Added ${characterData.postExamples.length} post examples`);
@@ -259,28 +269,9 @@ export class TweetProcessor {
 	}
 }
 
-// Usage
-const run = async () => {
-	const args = process.argv.slice(2);
-	const username = args[0];
-	const date = args[1];
 
-	if (!username) {
-		console.error("Please provide a username");
-		process.exit(1);
-	}
+//  "puppeteer-cluster": "^0.24.0",
+//  "puppeteer-extra": "^3.3.6",
+//  "puppeteer-extra-plugin-adblocker": "^2.13.6",
+//  "puppeteer-extra-plugin-stealth": "^2.11.2",
 
-	if (!date) {
-		console.error("Please provide a date in format YYYY-MM-DD");
-		process.exit(1);
-	}
-
-	console.log(`Processing tweets for ${username} from ${date}`);
-	const processor = new TweetProcessor(username, date);
-	await processor.processTweets();
-};
-
-run().catch((error) => {
-	console.error(error);
-	process.exit(1);
-});

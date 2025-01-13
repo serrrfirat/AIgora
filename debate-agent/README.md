@@ -5,13 +5,9 @@
 
 ### Usage
 
-- You can directly call the debate-agent's script `pnpm run twitter` to scrape an account.
-- You can import `src/utils/scrapper/scrapeTweets` function to scrape an account.
+- You can directly call the debate-agent's script `pnpm run generate elonmusk` to scrape an account (defaults to `serrrfirat`), and generate a character feedable to eliza.
+- In the frontend, you can use `src/utils/scrapper/generateFromTwitter` which is the same as above, but function-wise.
 
-When scrapping, only tweets from a given date will be taken into account.
+The result of scrapping and generating will be a file, located under `debate-agent/characters/username.json` (for a given username, obv.). This will store the information so an agent can be created from it.
 
-The result of scrapping will be a file. This will store the information so an agent can be created from it.
-
-## Utils
-
-There are utils to load character files directly into `eliza`, like load character.
+Similarly to what you do with `pnpm start --character="characters/trump.character.json"`, replace `trump.character` with the chosen username.
