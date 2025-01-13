@@ -5,6 +5,7 @@ import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { OwnableRoles } from "solady/auth/OwnableRoles.sol";
 import { ReentrancyGuard } from "solady/utils/ReentrancyGuard.sol";
 import { ERC20 } from "solady/tokens/ERC20.sol";
+import "./GladiatorNFT.sol";
 
 contract MarketFactory is ReentrancyGuard, OwnableRoles {
     // Constants
@@ -92,6 +93,9 @@ contract MarketFactory is ReentrancyGuard, OwnableRoles {
     mapping(uint256 => uint256) public debateIdToMarketId; // debateId => marketId
     mapping(uint256 => uint256) public marketIdToDebateId; // marketId => debateId
     uint256 public marketCount;
+    GladiatorNFT public gladiatorNFT;
+    mapping(uint256 => uint256) public gladiatorIdToTokenId; // Maps gladiator index to NFT token ID
+    mapping(uint256 => uint256) public tokenIdToGladiatorId; // Maps NFT token ID to gladiator index
 
     // Events
     event MarketCreated(
@@ -169,7 +173,8 @@ contract MarketFactory is ReentrancyGuard, OwnableRoles {
         _;
     }
 
-    constructor() {
+    constructor(address _gladiatorNFT) {
+        gladiatorNFT = GladiatorNFT(_gladiatorNFT);
         _initializeOwner(msg.sender);
     }
 
@@ -213,34 +218,43 @@ contract MarketFactory is ReentrancyGuard, OwnableRoles {
         emit MarketCreated(marketId, _token, _debateId, new string[](0));
     }
 
-    function nominateGladiator(
-        uint256 marketId,
-        address gladiatorAddress,
-        string calldata gladiatorName,
-        bytes calldata publicKey
-    ) external {
-        Market storage market = markets[marketId];
-        require(!market.bondingCurve.isFulfilled, "Bonding complete");
-        require(gladiatorAddress != address(0), "Invalid gladiator address");
-        require(bytes(gladiatorName).length > 0, "Invalid gladiator name");
-        require(publicKey.length > 0, "Invalid public key");
-
-        // Check if gladiator already exists
-        for (uint256 i = 0; i < market.gladiators.length; i++) {
-            require(market.gladiators[i].aiAddress != gladiatorAddress, "Gladiator exists");
-            require(keccak256(bytes(market.gladiators[i].name)) != keccak256(bytes(gladiatorName)), "Name taken");
-        }
-
-        // Add new gladiator
-        market.gladiators.push(Gladiator({
-            aiAddress: gladiatorAddress,
-            name: gladiatorName,
-            index: market.gladiators.length,
+    function registerGladiator(
+        string memory name,
+        string memory model,
+        string memory publicKey
+    ) external returns (uint256) {
+        uint256 gladiatorId = gladiators.length;
+        gladiators.push(Gladiator({
+            aiAddress: msg.sender,
+            name: name,
+            model: model,
+            index: gladiatorId,
             isActive: true,
             publicKey: publicKey
         }));
 
-        emit GladiatorNominated(marketId, gladiatorAddress, gladiatorName, market.gladiators.length - 1);
+        // Mint NFT for the gladiator
+        uint256 tokenId = gladiatorNFT.mintGladiator(msg.sender, name, model);
+        gladiatorIdToTokenId[gladiatorId] = tokenId;
+        tokenIdToGladiatorId[tokenId] = gladiatorId;
+
+        emit GladiatorRegistered(gladiatorId, msg.sender, name);
+        return gladiatorId;
+    }
+
+    function nominateGladiator(uint256 gladiatorId, uint256 marketId) external {
+        require(gladiatorId < gladiators.length, "Invalid gladiator ID");
+        uint256 tokenId = gladiatorIdToTokenId[gladiatorId];
+        require(gladiatorNFT.ownerOf(tokenId) == msg.sender, "Not the owner of this gladiator");
+        
+        Gladiator storage gladiator = gladiators[gladiatorId];
+        require(gladiator.isActive, "Gladiator is not active");
+        
+        Market storage market = markets[marketId];
+        require(!market.resolved, "Market already resolved");
+        
+        market.gladiators.push(gladiatorId);
+        emit GladiatorNominated(marketId, gladiatorId);
     }
 
     function startNewRound(uint256 marketId) external {
