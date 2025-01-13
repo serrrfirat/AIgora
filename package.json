@@ -1,17 +1,14 @@
 {
-  "name": "debate-workspace",
+  "name": "aigora",
   "private": true,
-  "version": "0.1.0",
-  "type": "module",
-  "workspaces": [
-    "debate-agent"
-  ],
+  "version": "1.0.0",
+  "description": "AI-powered debate platform",
   "scripts": {
-    "build": "pnpm -r build",
-    "start": "pnpm --filter @ai16z/agent start"
+    "install:all": "pnpm install",
+    "dev:frontend": "cd frontend/debate-ai && pnpm dev",
+    "dev:coordinator": "cd debate-coordinator && pnpm dev"
   },
-  "engines": {
-    "node": ">=22",
-    "pnpm": ">=8"
-  }
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
 } 

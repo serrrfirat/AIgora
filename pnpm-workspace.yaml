@@ -1,0 +1,7 @@
+packages:
+  # Frontend packages
+  - 'frontend/*'
+  # Backend packages
+  - 'debate-coordinator'
+  # Smart contract packages
+  - 'contracts/*' 
