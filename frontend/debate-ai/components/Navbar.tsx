@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import navbarImg from "../public/navbar.png";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { Menu } from "lucide-react";
+import { ChevronDown, ExternalLink, Menu, Wallet } from "lucide-react";
 
 const Navbar = () => {
   const [isDrawerOpen, setDrawerOpen] = useState(false);
@@ -49,7 +49,7 @@ const Navbar = () => {
           style={{ backgroundImage: `url(${navbarImg.src})` }}
         >
           {/* Logo and Hamburger Container */}
-          <div className="flex items-center gap-2">
+          <div className="flex-1 items-center gap-2">
             <div className="text-white text-lg sm:text-2xl font-bold pixelated">
               AIgora
             </div>
@@ -63,30 +63,147 @@ const Navbar = () => {
               </button>
             </div>
           </div>
-
           {/* Navigation Buttons (Hidden on small screens) */}
-          <div className="hidden sm:flex space-x-4 relative">
-            <button className="text-white border-white border-2 bg-gray-800 px-2 py-1 rounded hover:bg-gray-700 text-xs pixelated">
+          <div className="hidden sm:flex space-x-4 relative flex-1 justify-center px-4 w-full ">
+            <button className="text-white border-white border-2 bg-gray-800 px-3 py-2 rounded hover:bg-gray-700 text-xs pixelated">
               Create Debate
             </button>
-            <button className="text-white border-white border-2 bg-gray-800 px-2 py-2 rounded hover:bg-gray-700 text-xs pixelated">
+            {/* <button className="text-white border-white border-2 bg-gray-800 px-2 py-2 rounded hover:bg-gray-700 text-xs pixelated">
               Active Debates
-            </button>
+            </button> */}
             <button className="text-white border-white border-2 bg-gray-800 px-2 py-1 rounded hover:bg-gray-700 text-xs pixelated">
               Gladiators
             </button>
           </div>
 
           {/* Wallet Connection Button */}
-          <ConnectButton
-            accountStatus={{
-              smallScreen: "avatar",
-              largeScreen: "full",
-            }}
-          />
+          <div className="flex-1 flex justify-end ">
+            {/* <ConnectButton
+              accountStatus={{
+                smallScreen: "avatar",
+                largeScreen: "full",
+              }}
+            /> */}
+            <ConnectButton.Custom>
+              {({
+                account,
+                chain,
+                openAccountModal,
+                openChainModal,
+                openConnectModal,
+                authenticationStatus,
+                mounted,
+              }) => {
+                const ready = mounted && authenticationStatus !== "loading";
+                const connected =
+                  ready &&
+                  account &&
+                  chain &&
+                  (!authenticationStatus ||
+                    authenticationStatus === "authenticated");
+
+                return (
+                  <div
+                    {...(!ready && {
+                      "aria-hidden": true,
+                      style: {
+                        opacity: 0,
+                        pointerEvents: "none",
+                        userSelect: "none",
+                      },
+                    })}
+                  >
+                    {(() => {
+                      if (!connected) {
+                        return (
+                          <button
+                            onClick={openConnectModal}
+                            type="button"
+                            className="relative group px-3 sm:px-6 py-3 rounded-xl bg-gradient-to-b from-[#F5E6E0] to-[#E5D5CF] hover:from-[#E5D5CF] hover:to-[#D5C5BF] text-[#52362B] font-semibold transition-all duration-200 shadow-lg hover:shadow-xl"
+                          >
+                            <div className="flex items-center gap-2">
+                              <Wallet className="w-5 h-5" />
+                              <span className="hidden sm:inline">
+                                Connect Wallet
+                              </span>
+                            </div>
+                            <div className="absolute inset-0 rounded-xl border border-[#52362B]/10 group-hover:border-[#52362B]/20" />
+                          </button>
+                        );
+                      }
+
+                      if (chain.unsupported) {
+                        return (
+                          <button
+                            onClick={openChainModal}
+                            type="button"
+                            className="px-3 sm:px-6 py-3 rounded-xl bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 font-semibold transition-all duration-200 shadow hover:shadow-md flex items-center gap-2"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                            <span className="hidden sm:inline">
+                              Wrong Network
+                            </span>
+                          </button>
+                        );
+                      }
+
+                      return (
+                        <div className="flex items-center gap-2">
+                          {/* Network Button */}
+                          <button
+                            onClick={openChainModal}
+                            type="button"
+                            className="px-3 sm:px-4 py-2.5 rounded-xl bg-[#F5E6E0] hover:bg-[#E5D5CF] text-[#52362B] font-medium transition-all duration-200 flex items-center gap-2 border border-[#52362B]/10"
+                          >
+                            {chain.hasIcon && (
+                              <div className="w-5 h-5 rounded-full overflow-hidden border border-[#52362B]/10 bg-white flex-shrink-0">
+                                {chain.iconUrl && (
+                                  <img
+                                    alt={chain.name ?? "Chain icon"}
+                                    src={chain.iconUrl}
+                                    className="w-full h-full object-contain"
+                                  />
+                                )}
+                              </div>
+                            )}
+                            <span className="hidden sm:inline">
+                              {chain.name}
+                            </span>
+                          </button>
+
+                          {/* Account Button - Simplified for mobile */}
+                          <button
+                            onClick={openAccountModal}
+                            type="button"
+                            className="group px-3 sm:px-4 py-2.5 rounded-xl bg-gradient-to-b from-[#F5E6E0] to-[#E5D5CF] hover:from-[#E5D5CF] hover:to-[#D5C5BF] text-[#52362B] font-medium transition-all duration-200 relative"
+                          >
+                            <div className="flex items-center gap-2">
+                              {/* Mobile View - Just the first 4 and last 4 characters */}
+                              <span className="sm:hidden">
+                                {`${account.displayName.slice(
+                                  0,
+                                  4
+                                )}...${account.displayName.slice(-4)}`}
+                              </span>
+
+                              {/* Desktop View - Full address and chevron */}
+                              <div className="hidden sm:flex items-center gap-2">
+                                <span>{account.displayName}</span>
+                                <ChevronDown className="w-4 h-4 opacity-60" />
+                              </div>
+                            </div>
+                            <div className="absolute inset-0 rounded-xl border border-[#52362B]/10 group-hover:border-[#52362B]/20" />
+                          </button>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                );
+              }}
+            </ConnectButton.Custom>
+          </div>
         </div>
       </div>
-
       {/* Spacer for fixed navbar */}
       <div className="h-16 mb-6" />
 

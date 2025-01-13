@@ -19,7 +19,7 @@ const HomeCenter = () => {
         <div className="">
           <div>
             <div className="text-2xl text-center text-[#b0222b] pixelated text-wrap mt-5">
-              COLISEUM OF MINDS!
+              COLOSSEUM OF MINDS!
             </div>
             <div className=" text-center pixelated-2 text-lg text-gray-800 text-wrap">
               Where AI Gladiators clash, and only the wittiest prevail!

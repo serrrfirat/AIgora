@@ -93,38 +93,38 @@ export function DebateList() {
           return (
             <Card
               key={debateId.toString()}
-              className="group p-6 bg-[#202936] border-4 border-[#298080] rounded-lg shadow-md hover:shadow-xl transition-all cursor-pointer overflow-hidden relative"
-              onClick={() => handleDebateClick(debateId.toString())}
+              className="group p-6 bg-[#52362B] border-2 border-[#52362B] rounded-lg shadow-md hover:shadow-xl transition-all cursor-pointer overflow-hidden relative"
+              // onClick={() => handleDebateClick(debateId.toString())}
             >
               {/* Status Indicator */}
               <div
                 className={`absolute top-0 right-0 w-20 h-20 -mt-10 -mr-10 rotate-45 ${
-                  isActive ? "bg-green-500/20" : "bg-red-500/20"
+                  isActive ? "bg-[#D1BB9E]" : "bg-red-500/20"
                 }`}
               />
 
               <div className="flex flex-col gap-4">
                 {/* Topic Section */}
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-[#298080] mb-2">
-                    <MessageCircle className="w-4 h-4" />
-                    <span className="text-xs uppercase tracking-wider">
+                  <div className="flex items-center gap-2 text-[#FAF9F6] mb-2">
+                    {/* <MessageCircle className="w-4 h-4" /> */}
+                    {/* <span className="text-xs uppercase tracking-wider">
                       Debate Topic
-                    </span>
+                    </span> */}
                   </div>
-                  <h3 className="text-xl font-bold text-white leading-tight group-hover:text-[#298080] transition-colors">
+                  <h3 className="text-xl font-bold text-[#CCAA00] leading-tight group-hover:text-[#CCAA00] transition-colors">
                     {topic}
                   </h3>
                 </div>
 
                 {/* Stats Grid */}
-                <div className="grid grid-cols-2 gap-4 py-4 border-y border-[#298080]/20">
+                <div className="grid grid-cols-2 gap-4 py-4 border-y border-[#FAF9F6]/50">
                   <div className="flex items-center gap-2">
-                    <MessagesSquare className="w-4 h-4 text-[#298080]" />
+                    <MessagesSquare className="w-4 h-4 text-[#FAF9F6]" />
                     <span className="text-sm text-gray-400">0 Messages</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Activity className="w-4 h-4 text-[#298080]" />
+                    {/* <Activity className="w-4 h-4 text-[#FAF9F6]" /> */}
                     <div className="flex items-center gap-2">
                       {isActive && (
                         <div className="w-2 h-2 rounded-full bg-green-500 status-dot animate-blink" />
@@ -139,13 +139,13 @@ export function DebateList() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-[#298080]" />
+                    <Clock className="w-4 h-4 text-[#FAF9F6]" />
                     <span className="text-sm text-gray-400">
                       {currentRound.toString()}/{totalRounds.toString()} Rounds
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4 text-[#298080]" />
+                    <Users className="w-4 h-4 text-[#FAF9F6]" />
                     <span className="text-sm text-gray-400">
                       {judges.length} Judges
                     </span>
@@ -155,8 +155,8 @@ export function DebateList() {
                 {/* Footer */}
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-[#298080]/20 flex items-center justify-center">
-                      <Award className="w-4 h-4 text-[#298080]" />
+                    <div className="w-8 h-8 rounded-full bg-[#FAF9F6]/20 flex items-center justify-center">
+                      <Award className="w-4 h-4 text-[#FAF9F6]" />
                     </div>
                     <div className="flex flex-col">
                       <span className="text-xs text-gray-400">Created by</span>
@@ -168,7 +168,8 @@ export function DebateList() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="text-[#298080] hover:text-white hover:bg-[#298080] transition-colors"
+                    className="text-[#FAF9F6] hover:text-black hover:bg-[#FAF9F6] transition-colors"
+                    onClick={() => handleDebateClick(debateId.toString())}
                   >
                     View
                     <ChevronRight className="w-4 h-4 ml-1" />
@@ -177,8 +178,8 @@ export function DebateList() {
 
                 {/* Outcome Badge */}
                 {hasOutcome && (
-                  <div className="absolute top-4 right-4 px-2 py-1 bg-[#298080]/10 rounded-full border border-[#298080]/20">
-                    <span className="text-xs text-[#298080]">
+                  <div className="absolute top-4 right-4 px-2 py-1 bg-[#FAF9F6]/10 rounded-full border border-[#FAF9F6]/20">
+                    <span className="text-xs text-[#FAF9F6]">
                       Outcome: {finalOutcome.toString()}
                     </span>
                   </div>
@@ -195,7 +196,7 @@ export function DebateList() {
           <Button
             onClick={handleLoadMore}
             variant="outline"
-            className="border-[#298080] font-semibold text-[#298080] pixelated-2 hover:bg-[#298080] hover:text-white transition-colors gap-2"
+            className="border-[#52362B] font-semibold text-[#52362B] pixelated-2 hover:bg-[#52362B] hover:text-white transition-colors gap-2"
           >
             <Plus className="w-4 h-4 pixelated-2" />
             Load More Debates

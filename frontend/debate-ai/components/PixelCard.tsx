@@ -11,7 +11,7 @@ export default function PixelCard({
 }: PixelCardProps) {
   return (
     <div className={`pixel-corners--wrapper ${className}`}>
-      <div className="pixel-corners bg-[#202936] p-5 text-white">
+      <div className="pixel-corners bg-[#D2A679] p-5 text-[#2C2C2C]">
         {children}
       </div>
       <style jsx>{`
@@ -175,7 +175,8 @@ export default function PixelCard({
           bottom: 0;
           left: 0;
           right: 0;
-          background: teal;
+          background: #52362B;
+          background
           display: block;
           pointer-events: none;
         }
