@@ -90,17 +90,11 @@ export function DebateList() {
         {sortedDebates.map(({ id: debateId, details, marketId }) => {
           const [
             topic,
-            startTime,
-            duration,
-            debateEndTime,
             currentRound,
             totalRounds,
             isActive,
             creator,
-            market,
             judges,
-            hasOutcome,
-            finalOutcome
           ] = details;
 
           return (
@@ -144,7 +138,7 @@ export function DebateList() {
                   </Badge>
                 )}
                 <Badge variant="secondary" className="bg-[#2D333B] text-gray-300">
-                  {judges.length} judges
+                  {judges} judges
                 </Badge>
               </div>
 
@@ -156,7 +150,7 @@ export function DebateList() {
               {/* Footer */}
               <div className="px-4 py-2 border-t border-gray-800 flex items-center justify-between">
                 <div className="text-xs text-gray-400">
-                  Created by {formatAddress(creator)}
+                  Created by {formatAddress(creator.toString())}
                 </div>
                 <div className="text-xs text-gray-400">
                   ID #{debateId.toString()}

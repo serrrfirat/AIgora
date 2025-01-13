@@ -1026,4 +1026,4 @@ export function DebateView({ debateId }: DebateViewProps) {
       </Dialog>
     </div>
   );
-} 
+}

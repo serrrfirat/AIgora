@@ -1,6 +1,6 @@
 import { ethers } from 'ethers';
-import DebateFactoryABI from './abis/DebateFactory.json';
-import DebateABI from './abis/Debate.json';
+import DebateFactoryABI from '../config/abis/DebateFactory.json';
+import DebateABI from '../config/abis/MarketFactory.json';
 
 export const FACTORY_ADDRESS = process.env.NEXT_PUBLIC_FACTORY_ADDRESS as string;
 
@@ -58,7 +58,7 @@ export class DebateFactoryContract {
 
   constructor(provider: ethers.providers.Web3Provider) {
     this.signer = provider.getSigner();
-    this.contract = new ethers.Contract(FACTORY_ADDRESS, DebateFactoryABI, this.signer);
+    this.contract = new ethers.Contract(FACTORY_ADDRESS, DebateFactoryABI as any, this.signer);
   }
 
   async getDefaultConfig(): Promise<DebateConfig> {
@@ -92,7 +92,7 @@ export class DebateContract {
 
   constructor(address: string, provider: ethers.providers.Web3Provider) {
     this.signer = provider.getSigner();
-    this.contract = new ethers.Contract(address, DebateABI, this.signer);
+    this.contract = new ethers.Contract(address, DebateABI as any, this.signer);
   }
 
   async getDebateInfo(): Promise<DebateInfo> {
