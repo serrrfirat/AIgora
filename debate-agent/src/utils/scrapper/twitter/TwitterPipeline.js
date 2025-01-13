@@ -802,22 +802,22 @@ export class TwitterPipeline {
 				Logger.success("🔒 Cleaned up fallback system");
 			}
 
-			await this.saveProgress(null, null, this.stats.uniqueTweets, {
-				completed: true,
-				endTime: new Date().toISOString(),
-				fallbackUsed: this.stats.fallbackUsed,
-				fallbackCount: this.stats.fallbackCount,
-				rateLimitHits: this.stats.rateLimitHits,
-			});
+			//await this.saveProgress(null, null, this.stats.uniqueTweets, {
+			//	completed: true,
+			//	endTime: new Date().toISOString(),
+			//	fallbackUsed: this.stats.fallbackUsed,
+			//	fallbackCount: this.stats.fallbackCount,
+			//	rateLimitHits: this.stats.rateLimitHits,
+			//});
 
-			Logger.success("✨ Cleanup complete");
+			//Logger.success("✨ Cleanup complete");
 		} catch (error) {
-			Logger.warn(`⚠️  Cleanup error: ${error.message}`);
-			await this.saveProgress(null, null, this.stats.uniqueTweets, {
-				completed: true,
-				endTime: new Date().toISOString(),
-				error: error.message,
-			});
+			//Logger.warn(`⚠️  Cleanup error: ${error.message}`);
+			//await this.saveProgress(null, null, this.stats.uniqueTweets, {
+			//	completed: true,
+			//	endTime: new Date().toISOString(),
+			//	error: error.message,
+			//});
 		}
 	}
 }

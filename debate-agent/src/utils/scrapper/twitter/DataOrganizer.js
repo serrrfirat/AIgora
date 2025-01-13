@@ -134,9 +134,9 @@ class DataOrganizer {
 			}
 
 			// Generate and save summary
-			const summary = this.generateSummary(tweets, analytics);
-			await fs.writeFile(paths.exports.summary, summary, 'utf-8');
-			Logger.success(`✅ Saved summary to ${paths.exports.summary}`);
+			//const summary = this.generateSummary(tweets, analytics);
+			//await fs.writeFile(paths.exports.summary, summary, 'utf-8');
+			//Logger.success(`✅ Saved summary to ${paths.exports.summary}`);
 
 			return analytics;
 		} catch (error) {
