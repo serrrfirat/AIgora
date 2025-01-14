@@ -27,7 +27,6 @@
     "@wagmi/core": "^2.14.6",
     "@web3-react/core": "^8.2.3",
     "@web3-react/injected-connector": "^6.0.7",
-    "ai": "^4.0.22",
     "chart.js": "^4.4.7",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
