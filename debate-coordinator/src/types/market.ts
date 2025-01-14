@@ -6,6 +6,17 @@ export type Gladiator = {
   publicKey: string;
 };
 
+/**
+ * The judge deciding who wins
+ */
+export type Judge = {
+  aiAddress: string;
+  name: string;
+  index: bigint;
+  isActive: boolean;
+  publicKey: string;
+};
+
 export type JudgeVerdict = {
   scores: bigint[];
   timestamp: bigint;

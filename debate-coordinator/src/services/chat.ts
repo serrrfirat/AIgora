@@ -2,7 +2,7 @@ import { RedisService } from './redis';
 import { Message } from '../types/message';
 import { AgentClient } from './agent-client';
 import { Redis } from 'ioredis';
-import { v4 as uuidv4 } from 'uuid';
+import { v4 as uuid } from 'uuid';
 
 export class ChatService {
   private redis: Redis;
@@ -10,7 +10,7 @@ export class ChatService {
   private onMessage: (marketId: string, message: Message) => void;
 
   constructor(
-    redis: Redis, 
+    redis: Redis,
     agentClient: AgentClient,
     onMessage: (marketId: string, message: Message) => void
   ) {
@@ -50,10 +50,10 @@ export class ChatService {
       return existingRoomId;
     }
 
-    // Create new room with UUID
-    const roomId = uuidv4();
+    // Create new room with random UUID
+    const roomId = uuid();
     console.log(`Creating new chat room ${roomId} for debate ${debateId}`);
-    
+
     // Create bidirectional mapping
     await this.mapRoomToDebate(roomId, debateId);
 
@@ -66,8 +66,28 @@ export class ChatService {
     // Store initial message in room
     await this.redis.rpush(roomId, JSON.stringify(systemMessage));
     this.onMessage(debateId.toString(), systemMessage);
-    
+
     return roomId;
+  }
+
+  /**
+   * @param debateId  - Debate identifier
+   * @param judgeName - Judge's name
+   */
+  async joinJudge(debateId: bigint, judgeName: string): Promise<void> {
+    let roomId = await this.getRoomIdByDebateId(debateId);
+    if (!roomId) {
+      console.log(`judge ${judgeName} cannot join room ${roomId} because it does not exist`);
+      return;
+    }
+
+    const joinMessage: Message = {
+      sender: 'system',
+      content: `the judge ${judgeName} has joined the chat`,
+      timestamp: new Date().toISOString()
+    }
+    await this.redis.rpush(roomId, JSON.stringify(joinMessage));
+    this.onMessage(debateId.toString(), joinMessage);
   }
 
   async joinChatRoom(debateId: bigint, gladiatorName: string): Promise<void> {
@@ -139,7 +159,7 @@ export class ChatService {
     await this.sendMessage(
       debateId,
       'system',
-      'Welcome to the debate! You must convince Marcus AIurelius of your position. Present your arguments clearly and engage with other participants respectfully. '
+      'Welcome to the debate! You must convince the judge Marcus AIurelius of your position. Present your arguments clearly and engage with other participants respectfully. '
     );
 
     let currentSpeakerIndex = 0;
@@ -147,23 +167,25 @@ export class ChatService {
     while (true) {
       const currentGladiator = gladiators[currentSpeakerIndex];
       const mappedAgentId = agentMap[currentGladiator.agentId.toLowerCase()];
-      
+
       if (!mappedAgentId) {
         console.error(`No agent ID mapping found for address ${currentGladiator.agentId}`);
         currentSpeakerIndex = (currentSpeakerIndex + 1) % gladiators.length;
         continue;
       }
-      
+
       // Get last message
       const messages = await this.getMessages(debateId);
       const lastMessage = messages[messages.length - 1];
-      
+
       if (lastMessage) {
         try {
           console.log(`Attempting to send message to agent ${currentGladiator.name} (${currentGladiator.agentId}) -> ${mappedAgentId}`);
 
+          const agentId = uuid();
           // Send to current gladiator's agent server
           const response = await this.agentClient.sendMessage(
+            // TODO: can we use agentId here? is this `agentMap[currenGladiator.name]`?
             "ebeabd78-5beb-01b2-a37b-38a7b31a8858",
             {
               roomId: roomId,
@@ -185,6 +207,8 @@ export class ChatService {
             name: currentGladiator.name
           });
         }
+      } else {
+        console.log("there was no last message");
       }
 
       // Move to next gladiator
