@@ -45,8 +45,8 @@ export function CreateDebate() {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const [topic, setTopic] = useState('');
-  const [duration, setDuration] = useState('7');
-  const [rounds, setRounds] = useState('5');
+  const [duration, setDuration] = useState('1');
+  const [rounds, setRounds] = useState('3');
   const [judgeAI, setJudgeAI] = useState('');
 
   const { data: debateHash, writeContract: writeDebate, error: writeError, isPending: isDebatePending } = useWriteContract();
@@ -136,9 +136,6 @@ export function CreateDebate() {
             args: [
               MOCK_TOKEN_ADDRESS as `0x${string}`,
               decodedEvent.args.debateId,
-              GLADIATOR_ADDRESSES as unknown as `0x${string}`[],
-              GLADIATOR_NAMES,
-              GLADIATOR_PUBLIC_KEYS as unknown as `0x${string}`[],
               judgeAI as `0x${string}`,
               DEFAULT_BONDING_TARGET,
               DEFAULT_BONDING_DURATION,
@@ -160,14 +157,6 @@ export function CreateDebate() {
         <CardHeader>
           <CardTitle>Create a New Debate</CardTitle>
           <CardDescription>Set up a new debate topic and define its parameters</CardDescription>
-          <div className="text-sm text-gray-500 mt-2">
-            <p>Wallet connected: {isConnected ? 'Yes' : 'No'}</p>
-            <p>Wallet address: {address || 'Not connected'}</p>
-            <p>Network: {chainId}</p>
-            <p>Can write: {!writeError ? 'Yes' : 'No'}</p>
-            <p>Is pending: {isPending ? 'Yes' : 'No'}</p>
-            {writeError && <p className="text-red-500">Error: {writeError.message}</p>}
-          </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
