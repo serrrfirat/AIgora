@@ -64,4 +64,8 @@ contract GladiatorNFT is ERC721, OwnableRoles {
     function ownerOf(uint256 tokenId) public view override returns (address) {
         return super.ownerOf(tokenId);
     }
+
+    function getTokenCount() external view returns (uint256) {
+        return _tokenIds;
+    }
 } 

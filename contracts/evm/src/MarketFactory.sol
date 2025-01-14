@@ -820,5 +820,14 @@ contract MarketFactory is ReentrancyGuard, OwnableRoles {
         }
         
         return (totalScores, gladiatorIndexes);
+    }    
+
+    function getAllGladiators() external view returns (Gladiator[] memory) {
+        uint256 count = gladiatorNFT.getTokenCount();
+        Gladiator[] memory result = new Gladiator[](count);
+        for (uint256 i = 1; i <= count; i++) {
+            result[i-1] = gladiators[i];
+        }
+        return result;
     }
 } 

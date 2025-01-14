@@ -1,8 +1,8 @@
 {
-  "token": "0x4cf1A3Cf4B6cd6a2a9F95b05f2f99747d05c6C1d",
-  "debateFactory": "0x5BcbD7142b60a807d40Cea5c274e6D36265E35Db",
-  "marketFactory": "0xe10415f99C648bc59C837Ea9121700eb7B2c85f1",
-  "gladiatorNFT": "0x60c78B2e494Dbe956B005833BB31078F40379797",
+  "token": "0x07220E5eEA8ab9c45d42E305d2D33Bc9cd2002e8",
+  "debateFactory": "0x5e468aE21571b26903Af9Ee695f941F86ccDa90B",
+  "marketFactory": "0xa80eb7DeE0E9528829432E8604Aac31053d5D225",
+  "gladiatorNFT": "0x746e47a31B8d6A59a26B4566e8a4E075665b92da",
   "debateId": 0,
   "marketId": 0,
   "gladiators": {
