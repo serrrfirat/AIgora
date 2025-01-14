@@ -1,27 +1,38 @@
-'use client';
-
-import { useReadContract, useReadContracts } from 'wagmi';
-import { DEBATE_FACTORY_ADDRESS, DEBATE_FACTORY_ABI, MARKET_FACTORY_ADDRESS, MARKET_FACTORY_ABI } from '@/config/contracts';
-import { Card } from './ui/card';
-import { formatAddress } from '@/lib/utils';
-import { Button } from './ui/button';
-import { ChatWindow } from './MiniChatWindow';
-import { type Abi } from 'viem';
-import { Badge } from './ui/badge';
+import { useState } from "react";
+import { useReadContract, useReadContracts } from "wagmi";
+import {
+  DEBATE_FACTORY_ADDRESS,
+  DEBATE_FACTORY_ABI,
+  MARKET_FACTORY_ADDRESS,
+  MARKET_FACTORY_ABI,
+} from "@/config/contracts";
+import { Card } from "./ui/card";
+import { formatAddress } from "@/lib/utils";
+import { Button } from "./ui/button";
+import { ChatWindow } from "./MiniChatWindow";
+import { type Abi } from "viem";
+import {
+  Award,
+  ChevronRight,
+  Clock,
+  MessagesSquare,
+  Plus,
+  Users,
+} from "lucide-react";
 
 type DebateDetails = [
-  string,      // topic
-  bigint,      // startTime
-  bigint,      // duration
-  bigint,      // debateEndTime
-  bigint,      // currentRound
-  bigint,      // totalRounds
-  boolean,     // isActive
-  string,      // creator
-  string,      // market
-  string[],    // judges
-  boolean,     // hasOutcome
-  bigint       // finalOutcome
+  string, // topic
+  bigint, // startTime
+  bigint, // duration
+  bigint, // debateEndTime
+  bigint, // currentRound
+  bigint, // totalRounds
+  boolean, // isActive
+  string, // creator
+  string, // market
+  string[], // judges
+  boolean, // hasOutcome
+  bigint // finalOutcome
 ];
 
 interface DebateWithId {
@@ -39,11 +50,13 @@ function sortDebatesByStartTime(debates: DebateWithId[]): DebateWithId[] {
 }
 
 export function DebateList() {
+  const [visibleItems, setVisibleItems] = useState(6);
+
   // Get all debate IDs
   const { data: debateIds } = useReadContract({
     address: DEBATE_FACTORY_ADDRESS,
     abi: DEBATE_FACTORY_ABI as unknown as Abi,
-    functionName: 'getAllDebates',
+    functionName: "getAllDebates",
   }) as { data: bigint[] | undefined };
 
   // Get debate details for each ID
@@ -51,7 +64,7 @@ export function DebateList() {
     contracts: (debateIds || []).map((id) => ({
       address: DEBATE_FACTORY_ADDRESS,
       abi: DEBATE_FACTORY_ABI as unknown as Abi,
-      functionName: 'getDebateDetails',
+      functionName: "getDebateDetails",
       args: [id],
     })),
   });
@@ -61,7 +74,7 @@ export function DebateList() {
     contracts: (debateIds || []).map((id) => ({
       address: MARKET_FACTORY_ADDRESS,
       abi: MARKET_FACTORY_ABI as unknown as Abi,
-      functionName: 'debateIdToMarketId',
+      functionName: "debateIdToMarketId",
       args: [id],
     })),
   });
@@ -75,19 +88,26 @@ export function DebateList() {
   debateIds?.forEach((id, index) => {
     const details = debateDetails?.[index]?.result as DebateDetails | undefined;
     const marketId = marketIdsData?.[index]?.result as bigint | undefined;
-    
+
     if (details && marketId) {
       debates.push({ id, details, marketId });
     }
   });
 
   const sortedDebates = sortDebatesByStartTime(debates);
+  const visibleDebates = sortedDebates.slice(0, visibleItems);
+  const hasMore = visibleItems < sortedDebates.length;
+
+  const handleLoadMore = () => {
+    setVisibleItems((prev) => prev + 6);
+  };
 
   return (
-    <div className="container mx-auto p-4">
-      {/* Grid layout for debate cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {sortedDebates.map(({ id: debateId, details, marketId }) => {
+    <div className="space-y-8 p-4 w-full flex flex-col items-center pixelated-2">
+      <div className="grid w-[80vw] grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {visibleDebates.map(({ id: debateId, details, marketId }) => {
+          if (!details) return null;
+
           const [
             topic,
             currentRound,
@@ -95,71 +115,108 @@ export function DebateList() {
             isActive,
             creator,
             judges,
+            hasOutcome,
+            finalOutcome,
           ] = details;
 
           return (
-            <Card 
-              key={debateId.toString()} 
-              className="bg-[#1C2128] border-0 overflow-hidden hover:shadow-lg transition-shadow"
+            <Card
+              key={debateId.toString()}
+              className="group p-6 bg-[#52362B] border-2 border-[#52362B] rounded-lg shadow-md hover:shadow-xl transition-all cursor-pointer overflow-hidden relative"
             >
-              {/* Header */}
-              <div className="flex items-center justify-between p-4 border-b border-gray-800">
-                <div className="flex items-center space-x-2">
-                  <span className="text-gray-400">#</span>
-                  <h3 className="text-sm font-medium text-gray-300 truncate">
-                    {topic.toLowerCase().replace(/\s+/g, '-')}
+              <div
+                className={`absolute top-0 right-0 w-20 h-20 -mt-10 -mr-10 rotate-45 ${
+                  isActive ? "bg-[#D1BB9E]" : "bg-red-500/20"
+                }`}
+              />
+
+              <div className="flex flex-col gap-4">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-[#FAF9F6] mb-2"></div>
+                  <h3 className="text-xl font-bold text-[#CCAA00] leading-tight group-hover:text-[#CCAA00] transition-colors">
+                    {topic}
                   </h3>
                 </div>
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  className="text-gray-400 hover:text-white"
-                  onClick={() => handleDebateClick(debateId.toString())}
-                >
-                  <span className="sr-only">Expand</span>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M7 17l9.2-9.2M17 17V7H7"/>
-                  </svg>
-                </Button>
-              </div>
 
-              {/* Status badges */}
-              <div className="px-4 py-2 flex gap-2 flex-wrap">
-                <Badge variant="secondary" className="bg-[#2D333B] text-gray-300">
-                  Round {currentRound.toString()}/{totalRounds.toString()}
-                </Badge>
-                {isActive ? (
-                  <Badge variant="secondary" className="bg-green-900/30 text-green-400">
-                    Live
-                  </Badge>
-                ) : (
-                  <Badge variant="secondary" className="bg-red-900/30 text-red-400">
-                    Ended
-                  </Badge>
-                )}
-                <Badge variant="secondary" className="bg-[#2D333B] text-gray-300">
-                  {judges} judges
-                </Badge>
-              </div>
-
-              {/* Chat window */}
-              <div className="h-[300px] border-t border-gray-800">
-                <ChatWindow marketId={marketId} />
-              </div>
-
-              {/* Footer */}
-              <div className="px-4 py-2 border-t border-gray-800 flex items-center justify-between">
-                <div className="text-xs text-gray-400">
-                  Created by {formatAddress(creator.toString())}
+                <div className="grid grid-cols-2 gap-4 py-4 border-y border-[#FAF9F6]/50">
+                  <div className="flex items-center gap-2">
+                    <MessagesSquare className="w-4 h-4 text-[#FAF9F6]" />
+                    <span className="text-sm text-gray-400">0 Messages</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2">
+                      {isActive && (
+                        <div className="w-2 h-2 rounded-full bg-green-500 status-dot animate-blink" />
+                      )}
+                      <span
+                        className={`text-sm ${
+                          isActive ? "text-green-400" : "text-red-400"
+                        }`}
+                      >
+                        {isActive ? "Active" : "Completed"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-[#FAF9F6]" />
+                    <span className="text-sm text-gray-400">
+                      {currentRound.toString()}/{totalRounds.toString()} Rounds
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-[#FAF9F6]" />
+                    <span className="text-sm text-gray-400">
+                      {judges} Judges
+                    </span>
+                  </div>
                 </div>
-                <div className="text-xs text-gray-400">
-                  ID #{debateId.toString()}
+
+                <div className="h-[300px] border-t border-gray-800">
+                  <ChatWindow marketId={marketId} />
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-[#FAF9F6]/20 flex items-center justify-center">
+                      <Award className="w-4 h-4 text-[#FAF9F6]" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-xs text-gray-400">Created by</span>
+                      <span className="text-sm text-white">
+                        {formatAddress(creator.toString())}
+                      </span>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-[#FAF9F6] hover:text-black hover:bg-[#FAF9F6] transition-colors"
+                    onClick={() => handleDebateClick(debateId.toString())}
+                  >
+                    View
+                    <ChevronRight className="w-4 h-4 ml-1" />
+                  </Button>
                 </div>
               </div>
             </Card>
           );
         })}
       </div>
+
+      {hasMore && (
+        <div className="flex justify-center pt-4">
+          <Button
+            onClick={handleLoadMore}
+            variant="outline"
+            className="border-[#52362B] font-semibold text-[#52362B] pixelated-2 hover:bg-[#52362B] hover:text-white transition-colors gap-2"
+          >
+            <Plus className="w-4 h-4 pixelated-2" />
+            Load More Debates
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
+
+export default DebateList;
