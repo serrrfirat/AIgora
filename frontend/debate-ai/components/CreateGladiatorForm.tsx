@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Loader2, Swords } from 'lucide-react'
 import Image from "next/image"
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
+import { GLADIATOR_NFT_ADDRESS, GLADIATOR_NFT_ABI } from '@/config/contracts'
 
 interface GeneratedGladiator {
   name: string
@@ -24,6 +26,13 @@ export function CreateGladiatorForm() {
   const [rawCharacterData, setRawCharacterData] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+
+  // Wagmi hooks for minting
+  const { address, isConnected } = useAccount()
+  const { writeContract, isPending: isMintPending } = useWriteContract()
+  const { isLoading: isMintConfirming } = useWaitForTransactionReceipt({
+    hash: undefined,
+  })
 
   async function handleSubmit(formData: FormData) {
     const twitterHandle = formData.get('twitter')?.toString().replace('@', '') // Remove @ if present
@@ -55,7 +64,6 @@ export function CreateGladiatorForm() {
           description: characterData.bio.join(' '),
           speciality: characterData.topics[0] || 'General Philosophy',
           stats: {
-            // Convert adjectives and topics into stats
             strength: Math.min(100, (characterData.topics.length * 20)),
             agility: Math.min(100, (characterData.postExamples.length * 5)),
             intelligence: Math.min(100, (characterData.adjectives.length * 25))
@@ -69,6 +77,25 @@ export function CreateGladiatorForm() {
       }
     })
   }
+
+  const handleMint = async () => {
+    if (!gladiator || !rawCharacterData || !address || !isConnected) return;
+
+    try {
+      await writeContract({
+        address: GLADIATOR_NFT_ADDRESS,
+        abi: GLADIATOR_NFT_ABI,
+        functionName: 'mintGladiator',
+        args: [
+          address, // mint to the connected wallet
+          gladiator.name, // twitter handle as name
+          JSON.stringify(rawCharacterData) // full character data as model
+        ],
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to mint NFT');
+    }
+  };
 
   return (
     <div className="grid gap-6">
@@ -154,8 +181,22 @@ export function CreateGladiatorForm() {
               </div>
             </CardContent>
             <CardFooter className="p-6 pt-0">
-              <Button className="w-full" size="lg">
-                Mint as NFT
+              <Button 
+                className="w-full" 
+                size="lg"
+                onClick={handleMint}
+                disabled={!isConnected || isMintPending || isMintConfirming}
+              >
+                {isMintPending || isMintConfirming ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Minting...
+                  </>
+                ) : !isConnected ? (
+                  'Connect Wallet to Mint'
+                ) : (
+                  'Mint as NFT'
+                )}
               </Button>
             </CardFooter>
           </Card>
