@@ -91,7 +91,7 @@ contract DeployDebateMarket is Script, Utils {
 
     function writeBaseJson() internal {
         string memory jsonObj = "{"
-            '"token":"","debateFactory":"","marketFactory":"",'
+            '"token":"","debateFactory":"","marketFactory":"","gladiatorNFT":"",'
             '"debateId":"","marketId":"","gladiators":{'
             '"gpt4":{"address":"","name":"GPT-4 Champion","model":"GPT-4"},'
             '"claude":{"address":"","name":"Claude Warrior","model":"Claude-2"},'
