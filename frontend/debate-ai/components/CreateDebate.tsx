@@ -153,25 +153,26 @@ export function CreateDebate() {
 
   return (
     <>
-      <Card>
+      <Card className="bg-black border border-white/10">
         <CardHeader>
-          <CardTitle>Create a New Debate</CardTitle>
-          <CardDescription>Set up a new debate topic and define its parameters</CardDescription>
+          <CardTitle className="text-white">Create a New Debate</CardTitle>
+          <CardDescription className="text-gray-400">Set up a new debate topic and define its parameters</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <Label htmlFor="topic">Topic</Label>
+              <Label htmlFor="topic" className="text-gray-200">Topic</Label>
               <Input
                 id="topic"
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
                 placeholder="Enter debate topic"
                 required
+                className="bg-[#1C2128] border-white/10 text-white placeholder:text-gray-500"
               />
             </div>
             <div>
-              <Label htmlFor="duration">Duration (days)</Label>
+              <Label htmlFor="duration" className="text-gray-200">Duration (days)</Label>
               <Input
                 id="duration"
                 type="number"
@@ -179,10 +180,11 @@ export function CreateDebate() {
                 onChange={(e) => setDuration(e.target.value)}
                 min="1"
                 required
+                className="bg-[#1C2128] border-white/10 text-white"
               />
             </div>
             <div>
-              <Label htmlFor="rounds">Number of Rounds</Label>
+              <Label htmlFor="rounds" className="text-gray-200">Number of Rounds</Label>
               <Input
                 id="rounds"
                 type="number"
@@ -190,27 +192,29 @@ export function CreateDebate() {
                 onChange={(e) => setRounds(e.target.value)}
                 min="1"
                 required
+                className="bg-[#1C2128] border-white/10 text-white"
               />
             </div>
             <div>
-              <Label htmlFor="judgeAI">Judge AI Address</Label>
+              <Label htmlFor="judgeAI" className="text-gray-200">Judge AI Address</Label>
               <Input
                 id="judgeAI"
                 value={judgeAI}
                 onChange={(e) => setJudgeAI(e.target.value)}
                 placeholder="Enter Judge AI address"
                 required
+                className="bg-[#1C2128] border-white/10 text-white placeholder:text-gray-500"
               />
             </div>
             {!isConnected ? (
-              <div className="text-center p-4 bg-yellow-50 text-yellow-800 rounded-md">
+              <div className="text-center p-4 bg-[#1C2128] text-yellow-400 rounded-md border border-yellow-400/20">
                 Please connect your wallet to create a debate
               </div>
             ) : (
               <Button
                 type="submit"
                 disabled={isPending || !judgeAI}
-                className="w-full"
+                className="w-full bg-white text-black hover:bg-gray-200 disabled:bg-gray-600"
               >
                 {isPending ? 'Creating...' : 'Create Debate with Market'}
               </Button>
@@ -220,11 +224,11 @@ export function CreateDebate() {
       </Card>
 
       <Dialog open={isPending} onOpenChange={() => {}}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="bg-black border border-white/10">
           <div className="flex flex-col items-center gap-4 py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-            <p className="text-lg font-semibold">Transaction Being Processed</p>
-            <p className="text-sm text-gray-500">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+            <p className="text-lg font-semibold text-white">Transaction Being Processed</p>
+            <p className="text-sm text-gray-400">
               {isDebatePending || isConfirmingDebate 
                 ? 'Creating debate...' 
                 : 'Creating market...'}

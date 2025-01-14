@@ -7,6 +7,7 @@ import { GladiatorsGrid } from '@/components/gladiators-grid';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CreateGladiatorForm } from '@/components/CreateGladiatorForm';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
 
 export default function Home() {
   return (
@@ -16,6 +17,7 @@ export default function Home() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex justify-between items-center">
             <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white">agora.ai</h1>
+            <ConnectButton />
           </div>
         </div>
       </div>
