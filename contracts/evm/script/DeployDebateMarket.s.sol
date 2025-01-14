@@ -7,11 +7,13 @@ import { MarketFactory } from "../src/MarketFactory.sol";
 import { MockToken } from "../src/mocks/MockToken.sol";
 import { console2 } from "forge-std/console2.sol";
 import { Utils } from "./Utils.sol";
+import { GladiatorNFT } from "../src/GladiatorNFT.sol";
 
 contract DeployDebateMarket is Script, Utils {
     MockToken public token;
     DebateFactory public debateFactory;
     MarketFactory public marketFactory;
+    GladiatorNFT public gladiatorNFT;
 
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
@@ -29,8 +31,14 @@ contract DeployDebateMarket is Script, Utils {
         debateFactory = new DebateFactory();
         console2.log("DebateFactory deployed at:", address(debateFactory));
 
-        marketFactory = new MarketFactory();
+        gladiatorNFT = new GladiatorNFT();
+        console2.log("GladiatorNFT deployed at:", address(gladiatorNFT));
+
+        marketFactory = new MarketFactory(address(gladiatorNFT));
         console2.log("MarketFactory deployed at:", address(marketFactory));
+
+        // Set MarketFactory in GladiatorNFT
+        gladiatorNFT.setMarketFactory(address(marketFactory));
 
         // Create sample debate
         address[] memory judges = new address[](1);
@@ -44,43 +52,26 @@ contract DeployDebateMarket is Script, Utils {
         );
         console2.log("Sample debate created with ID:", debateId);
 
-        // Create sample gladiators
-        address[] memory gladiatorAddresses = new address[](3);
-        string[] memory gladiatorNames = new string[](3);
-        string[] memory gladiatorModels = new string[](3);
-        bytes[] memory gladiatorPublicKeys = new bytes[](3);
-
-        // GPT-4 Gladiator
-        gladiatorAddresses[0] = makeAddr("gpt4");
-        gladiatorNames[0] = "GPT-4 Champion";
-        gladiatorModels[0] = "GPT-4";
-        gladiatorPublicKeys[0] = bytes("pk1");
-
-        // Claude Gladiator
-        gladiatorAddresses[1] = makeAddr("claude");
-        gladiatorNames[1] = "Claude Warrior";
-        gladiatorModels[1] = "Claude-2";
-        gladiatorPublicKeys[1] = bytes("pk2");
-
-        // Llama Gladiator
-        gladiatorAddresses[2] = makeAddr("llama");
-        gladiatorNames[2] = "Llama Sage";
-        gladiatorModels[2] = "Llama-2";
-        gladiatorPublicKeys[2] = bytes("pk3");
-
-        // Create market with gladiators
+        // Create market
         uint256 marketId = marketFactory.createMarket(
             address(token),
             debateId,
-            gladiatorAddresses,
-            gladiatorNames,
-            gladiatorPublicKeys,
             deployer, // Judge AI address
             1000 * 10**18, // Bonding target
             1 days, // Bonding duration
             1 * 10**17 // Base price
         );
         console2.log("Sample market created with ID:", marketId);
+
+        // Register gladiators
+        uint256 gpt4TokenId = marketFactory.registerGladiator("GPT-4 Champion", "GPT-4", "pk1");
+        uint256 claudeTokenId = marketFactory.registerGladiator("Claude Warrior", "Claude-2", "pk2");
+        uint256 llamaTokenId = marketFactory.registerGladiator("Llama Sage", "Llama-2", "pk3");
+
+        // Nominate gladiators for the market
+        marketFactory.nominateGladiator(gpt4TokenId, marketId);
+        marketFactory.nominateGladiator(claudeTokenId, marketId);
+        marketFactory.nominateGladiator(llamaTokenId, marketId);
         
         vm.stopBroadcast();
 
@@ -89,6 +80,7 @@ contract DeployDebateMarket is Script, Utils {
         writeTo(address(token), ".token");
         writeTo(address(debateFactory), ".debateFactory");
         writeTo(address(marketFactory), ".marketFactory");
+        writeTo(address(gladiatorNFT), ".gladiatorNFT");
         writeTo(debateId, ".debateId");
         writeTo(marketId, ".marketId");
     }
