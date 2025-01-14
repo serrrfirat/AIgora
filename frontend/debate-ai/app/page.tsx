@@ -3,9 +3,10 @@
 import { Suspense } from 'react';
 import { CreateDebate } from '@/components/CreateDebate';
 import { DebateList } from '@/components/DebateList';
-import { GladiatorList } from '@/components/GladiatorList';
+import { GladiatorsGrid } from '@/components/gladiators-grid';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { CreateGladiatorForm } from '@/components/create-gladiator-form';
 
 export default function Home() {
   return (
@@ -20,10 +21,10 @@ export default function Home() {
       </div>
 
       {/* Main Content */}
-      <div className="container mx-auto px-4 py-6">
+      <div className="container mx-auto px-4 py-8">
         <Card className="bg-black border-0">
           <Tabs defaultValue="debates" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 bg-black border border-white/10">
+            <TabsList className="grid w-full grid-cols-4 bg-black border border-white/10">
               <TabsTrigger 
                 value="debates" 
                 className="data-[state=active]:bg-white data-[state=active]:text-black text-white text-sm md:text-base"
@@ -41,6 +42,12 @@ export default function Home() {
                 className="data-[state=active]:bg-white data-[state=active]:text-black text-white text-sm md:text-base"
               >
                 Create Debate
+              </TabsTrigger>
+              <TabsTrigger 
+                value="create-gladiator"
+                className="data-[state=active]:bg-white data-[state=active]:text-black text-white text-sm md:text-base"
+              >
+                Create Gladiator
               </TabsTrigger>
             </TabsList>
 
@@ -62,12 +69,15 @@ export default function Home() {
                   Loading gladiators...
                 </div>
               }>
-                <GladiatorList />
+                <GladiatorsGrid />
               </Suspense>
             </TabsContent>
 
             <TabsContent value="create" className="p-0">
               <CreateDebate />
+            </TabsContent>
+            <TabsContent value="create-gladiator" className="p-0">
+              <CreateGladiatorForm />
             </TabsContent>
           </Tabs>
         </Card>
