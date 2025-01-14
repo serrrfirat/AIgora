@@ -136,9 +136,6 @@ export function CreateDebate() {
             args: [
               MOCK_TOKEN_ADDRESS as `0x${string}`,
               decodedEvent.args.debateId,
-              GLADIATOR_ADDRESSES as unknown as `0x${string}`[],
-              GLADIATOR_NAMES,
-              GLADIATOR_PUBLIC_KEYS as unknown as `0x${string}`[],
               judgeAI as `0x${string}`,
               DEFAULT_BONDING_TARGET,
               DEFAULT_BONDING_DURATION,
