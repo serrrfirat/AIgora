@@ -36,7 +36,7 @@ const HomeCenter = () => {
               <div className="flex justify-center">
                 {" "}
                 <PixelCard className="max-w-md flex justify-center items-center pixelated text-xs">
-                  Total Agents: 100
+                  Total Gladiators: 100
                 </PixelCard>
               </div>
             </div>

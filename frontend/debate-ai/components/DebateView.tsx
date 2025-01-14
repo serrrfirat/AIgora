@@ -13,6 +13,7 @@ import { waitForTransactionReceipt } from 'viem/actions';
 import { config } from '@/config/wallet-config';
 import { ChevronDown } from 'lucide-react';
 import { BribeSubmission } from './BribeSubmission';
+import { NominateGladiatorCard } from './NominateGladiatorCard';
 
 interface Message {
   sender: string;
@@ -869,7 +870,7 @@ export function DebateView({ debateId }: DebateViewProps) {
       </div>
 
       {/* Side Panel */}
-      <div className="w-80 flex-shrink-0">
+      <div className="w-80 flex-shrink-0 space-y-4">
         <Card className="bg-[#1C2128] border-0">
           <CardContent className="p-6">
             <div className="space-y-6">
@@ -1002,6 +1003,12 @@ export function DebateView({ debateId }: DebateViewProps) {
             </div>
           </CardContent>
         </Card>
+
+        {/* Nomination Card */}
+        <NominateGladiatorCard 
+          marketId={marketId as bigint} 
+          isBondingCurveFulfilled={bondingCurve?.isFulfilled ?? false} 
+        />
       </div>
 
       {/* Add the confirmation dialog */}
