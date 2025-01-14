@@ -6,7 +6,7 @@ import { DebateList } from '@/components/DebateList';
 import { GladiatorsGrid } from '@/components/gladiators-grid';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CreateGladiatorForm } from '@/components/create-gladiator-form';
+import { CreateGladiatorForm } from '@/components/CreateGladiatorForm';
 
 export default function Home() {
   return (

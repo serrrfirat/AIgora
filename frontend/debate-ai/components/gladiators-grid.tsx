@@ -1,7 +1,7 @@
 import { Abi } from "viem";
 import { useReadContract } from "wagmi";
 import { MARKET_FACTORY_ABI, MARKET_FACTORY_ADDRESS } from "@/config/contracts";
-import { GladiatorCard } from "./gladiator-card"
+import { GladiatorCard } from "./GladiatorCard"
 import { useRouter } from 'next/navigation';
 
 export function GladiatorsGrid() {
