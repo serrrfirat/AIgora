@@ -8,6 +8,7 @@ import { Loader2, Swords } from 'lucide-react'
 import Image from "next/image"
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { GLADIATOR_NFT_ADDRESS, GLADIATOR_NFT_ABI } from '@/config/contracts'
+import { MARKET_FACTORY_ADDRESS, MARKET_FACTORY_ABI } from '@/config/contracts'
 
 interface GeneratedGladiator {
   name: string
@@ -26,14 +27,16 @@ export function CreateGladiatorForm() {
   const [rawCharacterData, setRawCharacterData] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const [showMintingModal, setShowMintingModal] = useState(false)
+  const [mintError, setMintError] = useState<string | null>(null)
 
   // Wagmi hooks for minting
   const { address, isConnected } = useAccount()
-  const { writeContract, isPending: isMintPending } = useWriteContract()
-  const { isLoading: isMintConfirming } = useWaitForTransactionReceipt({
-    hash: undefined,
+  const { writeContract, isPending: isMintPending, data: txHash } = useWriteContract()
+  const { isLoading: isMintConfirming, isSuccess: isMintSuccess, error: mintTxError } = useWaitForTransactionReceipt({
+    hash: txHash,
   })
-
+  const coordinatorUrl = process.env.NEXT_PUBLIC_COORDINATOR_URL;
   async function handleSubmit(formData: FormData) {
     const twitterHandle = formData.get('twitter')?.toString().replace('@', '') // Remove @ if present
     
@@ -42,7 +45,7 @@ export function CreateGladiatorForm() {
     startTransition(async () => {
       try {
         // Call the character generation endpoint
-        const response = await fetch('http://localhost:3003/api/character/generate', {
+        const response = await fetch(`${coordinatorUrl}/api/character/generate`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -82,20 +85,31 @@ export function CreateGladiatorForm() {
     if (!gladiator || !rawCharacterData || !address || !isConnected) return;
 
     try {
+      setShowMintingModal(true)
+      setMintError(null)
+    //   function registerGladiator(
+    //     string memory name,
+    //     string memory model,
+    //     string memory publicKey
+    // ) 
+
+    // TODO: get the public key from the character file
+    // dont give raw character data as the metadata, only give IPFS hash
+    const publicKey = Math.floor(Math.random() * 1000000).toString(16);
       await writeContract({
-        address: GLADIATOR_NFT_ADDRESS,
-        abi: GLADIATOR_NFT_ABI,
-        functionName: 'mintGladiator',
+        address: MARKET_FACTORY_ADDRESS,
+        abi: MARKET_FACTORY_ABI,
+        functionName: 'registerGladiator',
         args: [
-          address, // mint to the connected wallet
           gladiator.name, // twitter handle as name
-          JSON.stringify(rawCharacterData) // full character data as model
+          JSON.stringify(rawCharacterData), // full character data as model
+          publicKey // public key
         ],
-      });
+      })
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to mint NFT');
+      setMintError(e instanceof Error ? e.message : 'Failed to mint NFT')
     }
-  };
+  }
 
   return (
     <div className="grid gap-6">
