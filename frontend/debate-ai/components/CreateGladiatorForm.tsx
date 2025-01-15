@@ -20,11 +20,11 @@ interface GeneratedGladiator {
     agility: number
     intelligence: number
   }
+  ipfsUrl?: string
 }
 
 export function CreateGladiatorForm() {
   const [gladiator, setGladiator] = useState<GeneratedGladiator | null>(null)
-  const [rawCharacterData, setRawCharacterData] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const [showMintingModal, setShowMintingModal] = useState(false)
@@ -58,19 +58,19 @@ export function CreateGladiatorForm() {
         }
         
         const characterData = await response.json()
-        setRawCharacterData(characterData)
         
         // Transform the character data into the GeneratedGladiator format
         const gladiatorData: GeneratedGladiator = {
-          name: characterData.name,
+          name: characterData.data.name,
           image: process.env.NEXT_PUBLIC_DEFAULT_GLADIATOR_IMAGE || '/placeholder-gladiator.png',
-          description: characterData.bio.join(' '),
-          speciality: characterData.topics[0] || 'General Philosophy',
+          description: characterData.data.bio.join(' '),
+          speciality: characterData.data.topics[0] || 'General Philosophy',
           stats: {
-            strength: Math.min(100, (characterData.topics.length * 20)),
-            agility: Math.min(100, (characterData.postExamples.length * 5)),
-            intelligence: Math.min(100, (characterData.adjectives.length * 25))
-          }
+            strength: Math.min(100, (characterData.data.topics.length * 20)),
+            agility: Math.min(100, (characterData.data.postExamples.length * 5)),
+            intelligence: Math.min(100, (characterData.data.adjectives.length * 25))
+          },
+          ipfsUrl: characterData.data.ipfsUrl
         }
         
         setGladiator(gladiatorData)
@@ -82,28 +82,21 @@ export function CreateGladiatorForm() {
   }
 
   const handleMint = async () => {
-    if (!gladiator || !rawCharacterData || !address || !isConnected) return;
+    if (!gladiator || !address || !isConnected) return;
 
     try {
       setShowMintingModal(true)
       setMintError(null)
-    //   function registerGladiator(
-    //     string memory name,
-    //     string memory model,
-    //     string memory publicKey
-    // ) 
 
-    // TODO: get the public key from the character file
-    // dont give raw character data as the metadata, only give IPFS hash
-    const publicKey = Math.floor(Math.random() * 1000000).toString(16);
+      const publicKey = Math.floor(Math.random() * 1000000).toString(16);
       await writeContract({
         address: MARKET_FACTORY_ADDRESS,
         abi: MARKET_FACTORY_ABI,
         functionName: 'registerGladiator',
         args: [
-          gladiator.name, // twitter handle as name
-          JSON.stringify(rawCharacterData), // full character data as model
-          publicKey // public key
+          gladiator.name,
+          gladiator.ipfsUrl || '', // Use IPFS URL instead of raw data
+          publicKey
         ],
       })
     } catch (e) {
@@ -139,7 +132,7 @@ export function CreateGladiatorForm() {
         <p className="text-red-500 text-sm">{error}</p>
       )}
 
-      {gladiator && rawCharacterData && (
+      {gladiator && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Formatted Gladiator Card */}
           <Card className="overflow-hidden">
@@ -222,7 +215,7 @@ export function CreateGladiatorForm() {
             </CardHeader>
             <CardContent className="p-6">
               <pre className="bg-muted p-4 rounded-lg overflow-auto max-h-[600px] text-sm">
-                {JSON.stringify(rawCharacterData, null, 2)}
+                {JSON.stringify(gladiator, null, 2)}
               </pre>
             </CardContent>
           </Card>
