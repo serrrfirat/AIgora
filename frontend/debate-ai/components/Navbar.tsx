@@ -256,13 +256,22 @@ const Navbar = () => {
 
         {/* Drawer Content */}
         <div className="flex flex-col items-center mt-16 space-y-4">
-          <button className="text-white bg-gray-700 px-4 py-2 rounded hover:bg-gray-600 text-lg">
+          <button
+            className="text-white bg-gray-700 px-4 py-2 rounded hover:bg-gray-600 text-lg"
+            onClick={() => handleDebatesClick()}
+          >
             Create Debate
           </button>
-          <button className="text-white bg-gray-700 px-4 py-2 rounded hover:bg-gray-600 text-lg">
-            Active Debates
+          <button
+            className="text-white bg-gray-700 px-4 py-2 rounded hover:bg-gray-600 text-lg"
+            onClick={() => handleCreateGladiatorsClick()}
+          >
+            Create Gladiator
           </button>
-          <button className="text-white bg-gray-700 px-4 py-2 rounded hover:bg-gray-600 text-lg">
+          <button
+            className="text-white bg-gray-700 px-4 py-2 rounded hover:bg-gray-600 text-lg"
+            onClick={() => handleGladiatorsClick()}
+          >
             Gladiators
           </button>
         </div>
