@@ -5,6 +5,7 @@ import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { OwnableRoles } from "solady/auth/OwnableRoles.sol";
 import { ReentrancyGuard } from "solady/utils/ReentrancyGuard.sol";
 import { ERC20 } from "solady/tokens/ERC20.sol";
+import "./GladiatorNFT.sol";
 
 contract MarketFactory is ReentrancyGuard, OwnableRoles {
     // Constants
@@ -41,11 +42,10 @@ contract MarketFactory is ReentrancyGuard, OwnableRoles {
     }
 
     struct Gladiator {
-        address aiAddress;      // Address of the AI agent
-        string name;           // Name of the gladiator
-        uint256 index;        // Index in gladiators array
-        bool isActive;        // Whether still in competition
-        bytes publicKey;      // Public key for encrypted bribes
+        address aiAddress;
+        string name;
+        string publicKey;
+        bool isActive;
     }
 
     struct JudgeVerdict {
@@ -68,7 +68,8 @@ contract MarketFactory is ReentrancyGuard, OwnableRoles {
         uint256 winningGladiator;
         BondingCurve bondingCurve;
         uint256 totalBondingAmount;
-        Gladiator[] gladiators;
+        mapping(uint256 => Gladiator) gladiators; // Maps tokenId to Gladiator
+        uint256[] gladiatorTokenIds; // Array of tokenIds for iteration
         mapping(uint256 => Round) rounds;
         uint256 currentRound;
         mapping(uint256 => Order[]) orderBooks;
@@ -92,6 +93,10 @@ contract MarketFactory is ReentrancyGuard, OwnableRoles {
     mapping(uint256 => uint256) public debateIdToMarketId; // debateId => marketId
     mapping(uint256 => uint256) public marketIdToDebateId; // marketId => debateId
     uint256 public marketCount;
+    GladiatorNFT public gladiatorNFT;
+    mapping(uint256 => uint256) public gladiatorIdToTokenId; // Maps gladiator index to NFT token ID
+    mapping(uint256 => uint256) public tokenIdToGladiatorId; // Maps NFT token ID to gladiator index
+    mapping(uint256 => Gladiator) public gladiators; // Maps NFT token ID to Gladiator struct
 
     // Events
     event MarketCreated(
@@ -156,8 +161,9 @@ contract MarketFactory is ReentrancyGuard, OwnableRoles {
         uint256 indexed marketId,
         address indexed gladiatorAddress,
         string name,
-        uint256 indexed index
+        uint256 indexed tokenId
     );
+    event GladiatorRegistered(uint256 indexed tokenId, address indexed aiAddress, string name);
 
     modifier onlyDuringBonding(uint256 marketId) {
         Market storage market = markets[marketId];
@@ -169,7 +175,8 @@ contract MarketFactory is ReentrancyGuard, OwnableRoles {
         _;
     }
 
-    constructor() {
+    constructor(address _gladiatorNFT) {
+        gladiatorNFT = GladiatorNFT(_gladiatorNFT);
         _initializeOwner(msg.sender);
     }
 
@@ -213,34 +220,41 @@ contract MarketFactory is ReentrancyGuard, OwnableRoles {
         emit MarketCreated(marketId, _token, _debateId, new string[](0));
     }
 
-    function nominateGladiator(
-        uint256 marketId,
-        address gladiatorAddress,
-        string calldata gladiatorName,
-        bytes calldata publicKey
-    ) external {
+    function registerGladiator(
+        string memory name,
+        string memory model,
+        string memory publicKey
+    ) external returns (uint256) {
+        uint256 tokenId = gladiatorNFT.mintGladiator(msg.sender, name, model);
+        
+        gladiators[tokenId] = Gladiator({
+            aiAddress: msg.sender,
+            name: name,
+            publicKey: publicKey,
+            isActive: true
+        });
+
+        emit GladiatorRegistered(tokenId, msg.sender, name);
+        return tokenId;
+    }
+
+    function nominateGladiator(uint256 tokenId, uint256 marketId) external {
+        require(gladiatorNFT.ownerOf(tokenId) == msg.sender, "Not the owner of this gladiator");
+        
+        Gladiator storage gladiator = gladiators[tokenId];
+        require(gladiator.isActive, "Gladiator is not active");
+        
         Market storage market = markets[marketId];
-        require(!market.bondingCurve.isFulfilled, "Bonding complete");
-        require(gladiatorAddress != address(0), "Invalid gladiator address");
-        require(bytes(gladiatorName).length > 0, "Invalid gladiator name");
-        require(publicKey.length > 0, "Invalid public key");
-
-        // Check if gladiator already exists
-        for (uint256 i = 0; i < market.gladiators.length; i++) {
-            require(market.gladiators[i].aiAddress != gladiatorAddress, "Gladiator exists");
-            require(keccak256(bytes(market.gladiators[i].name)) != keccak256(bytes(gladiatorName)), "Name taken");
+        require(!market.resolved, "Market already resolved");
+        
+        // Check if gladiator is already nominated
+        for (uint256 i = 0; i < market.gladiatorTokenIds.length; i++) {
+            require(market.gladiatorTokenIds[i] != tokenId, "Gladiator already nominated");
         }
-
-        // Add new gladiator
-        market.gladiators.push(Gladiator({
-            aiAddress: gladiatorAddress,
-            name: gladiatorName,
-            index: market.gladiators.length,
-            isActive: true,
-            publicKey: publicKey
-        }));
-
-        emit GladiatorNominated(marketId, gladiatorAddress, gladiatorName, market.gladiators.length - 1);
+        
+        market.gladiators[tokenId] = gladiator;
+        market.gladiatorTokenIds.push(tokenId);
+        emit GladiatorNominated(marketId, gladiator.aiAddress, gladiator.name, tokenId);
     }
 
     function startNewRound(uint256 marketId) external {
@@ -283,7 +297,7 @@ contract MarketFactory is ReentrancyGuard, OwnableRoles {
         
         require(!round.isComplete, "Round complete");
         require(block.timestamp > round.endTime, "Round not ended");
-        require(scores.length == market.gladiators.length, "Invalid scores");
+        require(scores.length == market.gladiatorTokenIds.length, "Invalid scores");
 
         round.verdict = JudgeVerdict({
             scores: scores,
@@ -307,8 +321,8 @@ contract MarketFactory is ReentrancyGuard, OwnableRoles {
     ) external nonReentrant {
         Market storage market = markets[marketId];
         require(!market.resolved, "Market resolved");
-        require(gladiatorIndex < market.gladiators.length, "Invalid gladiator");
-        require(market.gladiators[gladiatorIndex].isActive, "Gladiator not active");
+        require(gladiatorIndex < market.gladiatorTokenIds.length, "Invalid gladiator");
+        require(market.gladiators[market.gladiatorTokenIds[gladiatorIndex]].isActive, "Gladiator not active");
         require(price >= MIN_PRICE && price <= MAX_PRICE, "Invalid price");
         require(amount >= MIN_ORDER_SIZE, "Order too small");
 
@@ -417,7 +431,7 @@ contract MarketFactory is ReentrancyGuard, OwnableRoles {
         uint256 orderId
     ) external nonReentrant {
         Market storage market = markets[marketId];
-        require(gladiatorIndex < market.gladiators.length, "Invalid gladiator");
+        require(gladiatorIndex < market.gladiatorTokenIds.length, "Invalid gladiator");
         Order[] storage orderBook = market.orderBooks[gladiatorIndex];
         require(orderId < orderBook.length, "Invalid order");
 
@@ -440,8 +454,8 @@ contract MarketFactory is ReentrancyGuard, OwnableRoles {
     function resolveMarket(uint256 marketId, uint256 winningGladiatorIndex) external onlyOwner {
         Market storage market = markets[marketId];
         require(!market.resolved, "Already resolved");
-        require(winningGladiatorIndex < market.gladiators.length, "Invalid gladiator");
-        require(market.gladiators[winningGladiatorIndex].isActive, "Gladiator not active");
+        require(winningGladiatorIndex < market.gladiatorTokenIds.length, "Invalid gladiator");
+        require(market.gladiators[market.gladiatorTokenIds[winningGladiatorIndex]].isActive, "Gladiator not active");
 
         market.resolved = true;
         market.winningGladiator = winningGladiatorIndex;
@@ -486,13 +500,13 @@ contract MarketFactory is ReentrancyGuard, OwnableRoles {
 
     function getOrderBook(uint256 marketId, uint256 gladiatorIndex) external view returns (Order[] memory) {
         Market storage market = markets[marketId];
-        require(gladiatorIndex < market.gladiators.length, "Invalid gladiator");
+        require(gladiatorIndex < market.gladiatorTokenIds.length, "Invalid gladiator");
         return market.orderBooks[gladiatorIndex];
     }
 
     function getCurrentPrice(uint256 marketId, uint256 gladiatorIndex) external view returns (uint256) {
         Market storage market = markets[marketId];
-        require(gladiatorIndex < market.gladiators.length, "Invalid gladiator");
+        require(gladiatorIndex < market.gladiatorTokenIds.length, "Invalid gladiator");
         Order[] storage orderBook = market.orderBooks[gladiatorIndex];
 
         if (orderBook.length == 0) {
@@ -503,7 +517,18 @@ contract MarketFactory is ReentrancyGuard, OwnableRoles {
     }
 
     function getGladiators(uint256 marketId) external view returns (Gladiator[] memory) {
-        return markets[marketId].gladiators;
+        Market storage market = markets[marketId];
+        Gladiator[] memory result = new Gladiator[](market.gladiatorTokenIds.length);
+        
+        for (uint256 i = 0; i < market.gladiatorTokenIds.length; i++) {
+            result[i] = market.gladiators[market.gladiatorTokenIds[i]];
+        }
+        
+        return result;
+    }
+
+    function getGladiatorTokenIds(uint256 marketId) external view returns (uint256[] memory) {
+        return markets[marketId].gladiatorTokenIds;
     }
 
     function getPosition(
@@ -512,7 +537,7 @@ contract MarketFactory is ReentrancyGuard, OwnableRoles {
         uint256 gladiatorIndex
     ) external view returns (uint256) {
         Market storage market = markets[marketId];
-        require(gladiatorIndex < market.gladiators.length, "Invalid gladiator");
+        require(gladiatorIndex < market.gladiatorTokenIds.length, "Invalid gladiator");
         return market.positions[user].shares[gladiatorIndex];
     }
 
@@ -542,9 +567,9 @@ contract MarketFactory is ReentrancyGuard, OwnableRoles {
 
     function getMarketPrices(uint256 marketId) external view returns (uint256[] memory) {
         Market storage market = markets[marketId];
-        uint256[] memory prices = new uint256[](market.gladiators.length);
+        uint256[] memory prices = new uint256[](market.gladiatorTokenIds.length);
         
-        for (uint256 i = 0; i < market.gladiators.length; i++) {
+        for (uint256 i = 0; i < market.gladiatorTokenIds.length; i++) {
             Order[] storage orderBook = market.orderBooks[i];
             if (orderBook.length > 0) {
                 prices[i] = orderBook[0].price;
@@ -558,9 +583,9 @@ contract MarketFactory is ReentrancyGuard, OwnableRoles {
 
     function getMarketVolumes(uint256 marketId) external view returns (uint256[] memory) {
         Market storage market = markets[marketId];
-        uint256[] memory volumes = new uint256[](market.gladiators.length);
+        uint256[] memory volumes = new uint256[](market.gladiatorTokenIds.length);
         
-        for (uint256 i = 0; i < market.gladiators.length; i++) {
+        for (uint256 i = 0; i < market.gladiatorTokenIds.length; i++) {
             volumes[i] = market.gladiatorVolumes[i];
         }
         
@@ -569,9 +594,9 @@ contract MarketFactory is ReentrancyGuard, OwnableRoles {
 
     function getUserPositions(uint256 marketId, address user) external view returns (uint256[] memory) {
         Market storage market = markets[marketId];
-        uint256[] memory positions = new uint256[](market.gladiators.length);
+        uint256[] memory positions = new uint256[](market.gladiatorTokenIds.length);
         
-        for (uint256 i = 0; i < market.gladiators.length; i++) {
+        for (uint256 i = 0; i < market.gladiatorTokenIds.length; i++) {
             positions[i] = market.positions[user].shares[i];
         }
         
@@ -605,7 +630,7 @@ contract MarketFactory is ReentrancyGuard, OwnableRoles {
         Market storage market = markets[marketId];
         uint256 total = 0;
         
-        for (uint256 i = 0; i < market.gladiators.length; i++) {
+        for (uint256 i = 0; i < market.gladiatorTokenIds.length; i++) {
             total += market.gladiatorVolumes[i];
         }
         
@@ -622,7 +647,7 @@ contract MarketFactory is ReentrancyGuard, OwnableRoles {
         Market storage market = markets[marketId];
         require(!market.resolved, "Market resolved");
         require(bytes(information).length <= 280, "Information too long");
-        require(gladiatorIndex < market.gladiators.length, "Invalid gladiator");
+        require(gladiatorIndex < market.gladiatorTokenIds.length, "Invalid gladiator");
 
         // Transfer tokens from user
         uint256 bribeAmount = 1 * 10**18; // 1 full token as bribe
@@ -743,7 +768,7 @@ contract MarketFactory is ReentrancyGuard, OwnableRoles {
         uint256[] memory roundScores
     ) {
         Market storage market = markets[marketId];
-        require(gladiatorIndex < market.gladiators.length, "Invalid gladiator");
+        require(gladiatorIndex < market.gladiatorTokenIds.length, "Invalid gladiator");
         
         roundScores = new uint256[](market.currentRound);
         for (uint256 i = 0; i < market.currentRound; i++) {
@@ -761,7 +786,7 @@ contract MarketFactory is ReentrancyGuard, OwnableRoles {
         uint256[] memory gladiatorIndexes
     ) {
         Market storage market = markets[marketId];
-        uint256 gladiatorCount = market.gladiators.length;
+        uint256 gladiatorCount = market.gladiatorTokenIds.length;
         
         totalScores = new uint256[](gladiatorCount);
         gladiatorIndexes = new uint256[](gladiatorCount);
@@ -795,5 +820,14 @@ contract MarketFactory is ReentrancyGuard, OwnableRoles {
         }
         
         return (totalScores, gladiatorIndexes);
+    }    
+
+    function getAllGladiators() external view returns (Gladiator[] memory) {
+        uint256 count = gladiatorNFT.getTokenCount();
+        Gladiator[] memory result = new Gladiator[](count);
+        for (uint256 i = 1; i <= count; i++) {
+            result[i-1] = gladiators[i];
+        }
+        return result;
     }
 } 

@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { continueMessageHandlerTemplate, evaluationTemplate, factsTemplate, goalsTemplate, shouldRespondTemplate, twitterActionTemplate, twitterMessageHandlerTemplate, twitterPostTemplate, twitterSearchTemplate, twitterShouldRespondTemplate } from './templates';
+import { continueMessageHandlerTemplate, evaluationTemplate, factsTemplate, goalsTemplate, shouldRespondTemplate, twitterActionTemplate, twitterMessageHandlerTemplate, twitterPostTemplate, twitterSearchTemplate, twitterShouldRespondTemplate } from './templates.ts';
 import { messageHandlerTemplate } from '@elizaos/client-direct';
 
 /**
@@ -30,7 +30,7 @@ export const defaultTwitterTemplate: TwitterTemplate = {
 	twitterPostTemplate: convertToOneLine(twitterPostTemplate),
 	twitterActionTemplate: convertToOneLine(twitterActionTemplate),
 	twitterMessageHandlerTemplate: convertToOneLine(twitterMessageHandlerTemplate),
-	// FIXME: correct handlers
+	// FIXME: correct handlers + MarcusAIurelius
 	twitterShouldRespondTemplate: convertToOneLine(twitterShouldRespondTemplate("@Gladiator1,@Gladiator2,@Gladiator3")),
 };
 
@@ -78,20 +78,32 @@ export function lc(str: string): string {
 }
 
 
+/**
+ * Load a character from its JSON file.
+ *
+ * @param filePath - the path to the JSON file
+ */
+export function loadCharacter(filePath: fs.PathLike): AgentData {
+	let existingData = {} as AgentData;
+
+	if (fs.existsSync(filePath)) {
+		const fileContent = fs.readFileSync(filePath, 'utf-8');
+		existingData = JSON.parse(fileContent);
+		console.log("Existing character found. Updating...");
+	} else {
+		console.log("No existing character found...");
+	}
+
+	return existingData;
+}
+
 /** Create or update a JSON object
-*
+ *
  * @param filePath - the path to the JSON
  * @param newData - the new JSON object
  */
 export function createOrUpdateJsonFile(filePath: fs.PathLike, newData: AgentData) {
-	let existingData: AgentData;
-	if (fs.existsSync(filePath)) {
-		const fileContent = fs.readFileSync(filePath, 'utf-8');
-		existingData = JSON.parse(fileContent);
-		console.log("Existing file found. Updating...");
-	} else {
-		console.log("No existing file found. Creating new file...");
-	}
+	let existingData = loadCharacter(filePath);
 
 	// Merge existing data with new data
 	const updatedData = {
@@ -107,8 +119,20 @@ export function createOrUpdateJsonFile(filePath: fs.PathLike, newData: AgentData
 	const jsonString = JSON.stringify(updatedData, null, 2);
 
 	// Write to file
+	if (!fs.existsSync("characters/")) {
+		console.log("Creating characters directory...");
+		fs.mkdirSync("characters/");
+	}
 	fs.writeFileSync(filePath, jsonString);
 
 	console.log(`JSON file '${filePath}' has been ${fs.existsSync(filePath) ? 'updated' : 'created'} successfully.`);
+}
+
+
+/**
+ * Combines two objects into a new one, keepeing fields from both.
+ */
+export function combineObjects<T extends object, U extends object>(obj1: T, obj2: U): T & U {
+	return { ...obj1, ...obj2 };
 }
 

@@ -29,6 +29,12 @@ type LeaderboardEntry = {
   gladiator: Gladiator;
 };
 
+type RoundData = {
+  roundIndex: bigint;
+  endTime: bigint;
+  isComplete: boolean;
+};
+
 interface GladiatorViewProps {
   marketId: bigint;
 }
@@ -63,16 +69,16 @@ export function GladiatorView({ marketId }: GladiatorViewProps) {
 
   // Format leaderboard data
   const leaderboard: LeaderboardEntry[] = leaderboardData 
-    ? leaderboardData[0].map((score: bigint, i: number) => ({
-        gladiatorIndex: leaderboardData[1][i],
+    ? (leaderboardData as [bigint[], bigint[]]) [0].map((score: bigint, i: number) => ({
+        gladiatorIndex: (leaderboardData as [bigint[], bigint[]])[1][i],
         totalScore: score,
-        gladiator: gladiators?.[Number(leaderboardData[1][i])]
+        gladiator: (gladiators as Gladiator[])?.[Number((leaderboardData as [bigint[], bigint[]])[1][i])]
       }))
     : [];
 
   // Calculate time remaining in current round
-  const timeRemaining = currentRound && currentRound.endTime > 0n
-    ? Number(currentRound.endTime) - Math.floor(Date.now() / 1000)
+  const timeRemaining = currentRound && (currentRound as { endTime: bigint }).endTime > 0n
+    ? Number((currentRound as { endTime: bigint }).endTime) - Math.floor(Date.now() / 1000)
     : 0;
 
   return (
@@ -82,9 +88,9 @@ export function GladiatorView({ marketId }: GladiatorViewProps) {
         <h2 className="text-xl font-bold mb-4">Current Round</h2>
         {currentRound ? (
           <div className="space-y-2">
-            <p>Round {currentRound.roundIndex.toString()}</p>
+            <p>Round {(currentRound as RoundData).roundIndex.toString()}</p>
             <p>Time Remaining: {Math.max(0, timeRemaining)} seconds</p>
-            <p>Status: {currentRound.isComplete ? 'Complete' : 'In Progress'}</p>
+            <p>Status: {(currentRound as RoundData).isComplete ? 'Complete' : 'In Progress'}</p>
           </div>
         ) : (
           <p>No active round</p>
@@ -95,7 +101,7 @@ export function GladiatorView({ marketId }: GladiatorViewProps) {
       <Card className="p-4 bg-[#1C2128] border-0">
         <h2 className="text-xl font-bold mb-4">Gladiators</h2>
         <div className="grid grid-cols-2 gap-4">
-          {gladiators?.map((gladiator: Gladiator) => (
+          {(gladiators as Gladiator[])?.map((gladiator: Gladiator) => (
             <Button
               key={gladiator.index.toString()}
               variant={selectedGladiator?.index === gladiator.index ? "default" : "outline"}
@@ -137,11 +143,8 @@ export function GladiatorView({ marketId }: GladiatorViewProps) {
       {selectedGladiator && (
         <BribeSubmission
           marketId={marketId}
-          roundId={currentRound?.roundIndex ?? 0n}
-          outcomes={[{
-            name: selectedGladiator.name,
-            index: selectedGladiator.index
-          }]}
+          roundId={(currentRound as RoundData)?.roundIndex ?? 0n}
+          gladiators={[selectedGladiator]}
           onBribeSubmitted={() => {
             // Refresh data after bribe
           }}

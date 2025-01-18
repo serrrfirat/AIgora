@@ -12,6 +12,18 @@ const Navbar = () => {
     setDrawerOpen(!isDrawerOpen);
   };
 
+  const handleGladiatorsClick = () => {
+    window.location.href = `/gladiators`;
+  };
+
+  const handleDebatesClick = () => {
+    window.location.href = `/create-debate`;
+  };
+
+  const handleCreateGladiatorsClick = () => {
+    window.location.href = `/create-gladiator`;
+  };
+
   useEffect(() => {
     const controlNavbar = () => {
       if (typeof window !== "undefined") {
@@ -39,11 +51,7 @@ const Navbar = () => {
 
   return (
     <>
-      <div
-        className={`fixed top-0 left-0 right-0 z-50 transition-transform duration-300 ${
-          isVisible ? "translate-y-0" : "-translate-y-full"
-        }`}
-      >
+      <div className={`fixed top-0 left-0 right-0 z-50 `}>
         <div
           className="h-16 flex items-center justify-between px-4 sm:bg-no-repeat sm:bg-cover bg-gray-900 sm:bg-transparent"
           style={{ backgroundImage: `url(${navbarImg.src})` }}
@@ -65,14 +73,26 @@ const Navbar = () => {
           </div>
           {/* Navigation Buttons (Hidden on small screens) */}
           <div className="hidden sm:flex space-x-4 relative flex-1 justify-center px-4 w-full ">
-            <button className="text-white border-white border-2 bg-gray-800 px-3 py-2 rounded hover:bg-gray-700 text-xs pixelated">
+            <button
+              className="text-white border-white border-2 bg-gray-800 px-2 py-1 rounded hover:bg-gray-700 text-[10px] pixelated"
+              onClick={() => handleDebatesClick()}
+            >
               Create Debate
             </button>
             {/* <button className="text-white border-white border-2 bg-gray-800 px-2 py-2 rounded hover:bg-gray-700 text-xs pixelated">
               Active Debates
             </button> */}
-            <button className="text-white border-white border-2 bg-gray-800 px-2 py-1 rounded hover:bg-gray-700 text-xs pixelated">
+            <button
+              className="text-white border-white border-2 bg-gray-800 px-2 py-1 rounded hover:bg-gray-700 text-[10px] pixelated"
+              onClick={() => handleGladiatorsClick()}
+            >
               Gladiators
+            </button>
+            <button
+              className="text-white border-white border-2 bg-gray-800  rounded hover:bg-gray-700 text-[10px] pixelated"
+              onClick={() => handleCreateGladiatorsClick()}
+            >
+              Create Gladiator
             </button>
           </div>
 
@@ -119,7 +139,7 @@ const Navbar = () => {
                           <button
                             onClick={openConnectModal}
                             type="button"
-                            className="relative group px-3 sm:px-6 py-3 rounded-xl bg-gradient-to-b from-[#F5E6E0] to-[#E5D5CF] hover:from-[#E5D5CF] hover:to-[#D5C5BF] text-[#52362B] font-semibold transition-all duration-200 shadow-lg hover:shadow-xl"
+                            className=" pixelated-2 relative group px-2 sm:px-6 py-2 rounded-xl bg-gradient-to-b from-[#F5E6E0] to-[#E5D5CF] hover:from-[#E5D5CF] hover:to-[#D5C5BF] text-[#52362B] font-semibold transition-all duration-200 shadow-lg hover:shadow-xl"
                           >
                             <div className="flex items-center gap-2">
                               <Wallet className="w-5 h-5" />
@@ -137,7 +157,7 @@ const Navbar = () => {
                           <button
                             onClick={openChainModal}
                             type="button"
-                            className="px-3 sm:px-6 py-3 rounded-xl bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 font-semibold transition-all duration-200 shadow hover:shadow-md flex items-center gap-2"
+                            className="px-2 sm:px-6 py-2 rounded-xl bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 font-semibold transition-all duration-200 shadow hover:shadow-md flex items-center gap-2"
                           >
                             <ExternalLink className="w-4 h-4" />
                             <span className="hidden sm:inline">
@@ -148,12 +168,12 @@ const Navbar = () => {
                       }
 
                       return (
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 pixelated-2 ">
                           {/* Network Button */}
                           <button
                             onClick={openChainModal}
                             type="button"
-                            className="px-3 sm:px-4 py-2.5 rounded-xl bg-[#F5E6E0] hover:bg-[#E5D5CF] text-[#52362B] font-medium transition-all duration-200 flex items-center gap-2 border border-[#52362B]/10"
+                            className="px-2 sm:px-4 py-2 rounded-xl bg-[#F5E6E0] hover:bg-[#E5D5CF] text-[#52362B] font-medium transition-all duration-200 flex items-center gap-2 border border-[#52362B]/10"
                           >
                             {chain.hasIcon && (
                               <div className="w-5 h-5 rounded-full overflow-hidden border border-[#52362B]/10 bg-white flex-shrink-0">
@@ -175,7 +195,7 @@ const Navbar = () => {
                           <button
                             onClick={openAccountModal}
                             type="button"
-                            className="group px-3 sm:px-4 py-2.5 rounded-xl bg-gradient-to-b from-[#F5E6E0] to-[#E5D5CF] hover:from-[#E5D5CF] hover:to-[#D5C5BF] text-[#52362B] font-medium transition-all duration-200 relative"
+                            className="group px-2 sm:px-4 py-2 rounded-xl bg-gradient-to-b from-[#F5E6E0] to-[#E5D5CF] hover:from-[#E5D5CF] hover:to-[#D5C5BF] text-[#52362B] font-medium transition-all duration-200 relative"
                           >
                             <div className="flex items-center gap-2">
                               {/* Mobile View - Just the first 4 and last 4 characters */}

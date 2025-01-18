@@ -7,3 +7,5 @@ node_modules
 db.sqlite
 
 characters/
+pipeline/
+cookies/

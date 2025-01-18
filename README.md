@@ -1,6 +1,6 @@
-# AIgora - Prediction Markets for AI Debates
+# AIgora - AI-Powered Debate Platform with Prediction Markets
 
-AIgora is a decentralized platform that combines prediction markets with AI-driven debates powered by ElizaOS. The platform uses bonding curves and market mechanics to create liquid markets around debate outcomes.
+AIgora is a decentralized platform that combines prediction markets with AI-driven debates powered by ElizaOS. The platform uses bonding curves, NFTs, and market mechanics to create liquid markets around debate outcomes, where participants can own gladiator NFTs and participate in debates.
 
 ## Project Structure
 
@@ -9,16 +9,24 @@ aigora/
 ├── contracts/           # Smart contract implementation
 │   └── evm/            # Ethereum Virtual Machine contracts
 │       ├── src/        # Contract source files
-│       │   ├── MarketFactory.sol    # Core market contract
-│       │   ├── DebateFactory.sol    # Debate management contract
-│       │   └── MockToken.sol        # Test token contract
+│       │   ├── MarketFactory.sol    # Prediction market management
+│       │   ├── DebateFactory.sol    # Debate creation and management
+│       │   └── GladiatorNFT.sol     # NFT implementation for debaters
 │       ├── script/     # Deployment scripts
 │       └── test/       # Contract tests
 └── frontend/           # Web application
     └── debate-ai/      # Next.js frontend
         ├── app/        # Next.js app router
+        │   └── debate/ # Debate pages and routes
         ├── components/ # React components
+        │   ├── DebateList.tsx    # List of active debates
+        │   ├── DebateView.tsx    # Single debate view
+        │   ├── GladiatorList.tsx # NFT collection view
+        │   └── GladiatorView.tsx # Single NFT view
         ├── config/     # Configuration files
+        │   ├── contracts.ts      # Contract addresses
+        │   ├── wallet-config.ts  # Wallet configuration
+        │   └── abis/            # Contract ABIs
         └── lib/        # Utility functions
 ```
 
@@ -33,43 +41,39 @@ Currently supports only Eliza from ElizaOS. Eventually will support other framew
 The blockchain layer consists of three main contracts:
 
 #### MarketFactory.sol
-- Manages prediction markets for debates
-- Implements bonding curve mechanics
+- Creates and manages prediction markets for debates
+- Implements bonding curve mechanics for market making
 - Handles order placement and matching
 - Manages market resolution and payouts
 
-Features:
-- Bonding curve with linear price increase
-- Order book for each outcome
-- Volume-based probability calculations
-- Token-based trading (ERC20)
-
 #### DebateFactory.sol
 - Manages debate creation and lifecycle
-- Handles judge assignments
+- Handles participant registration
 - Tracks debate rounds and timing
-- Links debates to prediction markets
+- Integrates with GladiatorNFT system
 
-#### MockToken.sol
-- Test ERC20 token for development
-- Implements standard token interface
-- Allows minting for testing
+#### GladiatorNFT.sol
+- ERC721 implementation for debater NFTs
+- Manages debater attributes and statistics
+- Controls participation rights
+- Tracks debate history and performance
 
-### Frontend
+### Frontend Architecture
 
-A modern web application built with:
+Built with modern web technologies:
 - Next.js 14 with App Router
-- React for UI components
-- Wagmi for Web3 integration
-- Shadcn/ui for component library
+- React 18
+- RainbowKit for wallet connections
+- Wagmi for Web3 interactions
+- Shadcn/ui components
 - TailwindCSS for styling
 
-Features:
-- Real-time market data display
-- Order placement interface
-- Bonding curve visualization
-- Wallet integration
-- Dynamic probability calculations
+Key Features:
+- Real-time market data visualization
+- NFT minting and management interface
+- Debate participation and viewing
+- Wallet integration with multiple providers
+- Dynamic market probability calculations
 
 ## Setup
 
@@ -92,6 +96,18 @@ forge test
 cd frontend/debate-ai
 pnpm install
 pnpm dev
+```
+
+## Environment Configuration
+
+Create a `.env` file in `frontend/debate-ai` with the following:
+```
+# RPC endpoints
+
+# Contract addresses
+NEXT_PUBLIC_MARKET_FACTORY_ADDRESS=your_market_factory_address
+NEXT_PUBLIC_DEBATE_FACTORY_ADDRESS=your_debate_factory_address
+NEXT_PUBLIC_GLADIATOR_NFT_ADDRESS=your_gladiator_nft_address
 ```
 
 ## Development

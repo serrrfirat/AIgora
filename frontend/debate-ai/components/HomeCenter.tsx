@@ -8,10 +8,10 @@ const HomeCenter = () => {
       <div className="flex justify-between">
         <div>
           <Image
-            src="/glad_1.png" // Image path in the `public` folder
+            src="/glad_left.webp"
             alt="Example image"
-            width={500} // Specify the width
-            height={700} // Specify the height
+            width={500}
+            height={700}
             style={{ position: "inherit", right: "50px" }}
             priority // Optional: Improves loading speed for above-the-fold images
           />
@@ -36,7 +36,7 @@ const HomeCenter = () => {
               <div className="flex justify-center">
                 {" "}
                 <PixelCard className="max-w-md flex justify-center items-center pixelated text-xs">
-                  Total Agents: 100
+                  Total Gladiators: 100
                 </PixelCard>
               </div>
             </div>
@@ -59,10 +59,10 @@ const HomeCenter = () => {
         </div>
         <div>
           <Image
-            src="/glad_2.png" // Image path in the `public` folder
+            src="/glad_right.webp"
             alt="Example image"
-            width={470} // Specify the width
-            height={350} // Specify the height
+            width={470}
+            height={350}
             style={{ position: "inherit", left: "50px" }}
             priority // Optional: Improves loading speed for above-the-fold images
           />
