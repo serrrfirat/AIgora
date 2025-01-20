@@ -148,6 +148,9 @@ export class ChatService {
 
     // Map contract addresses to agent IDs
     const agentMap: { [address: string]: string } = {
+      // NOTE: is this inverted (the name on the left, the address on the right)? 
+      // Shouldn't it be `{ [agentId: string]: string}`?
+      // Because below you are indexing by agentId.
       '0x1111111111111111111111111111111111111111': 'socrates',
       '0x2222222222222222222222222222222222222222': 'plato',
       '0x3333333333333333333333333333333333333333': 'aristotle',
@@ -182,10 +185,11 @@ export class ChatService {
         try {
           console.log(`Attempting to send message to agent ${currentGladiator.name} (${currentGladiator.agentId}) -> ${mappedAgentId}`);
 
-          const agentId = uuid();
           // Send to current gladiator's agent server
           const response = await this.agentClient.sendMessage(
-            // TODO: can we use agentId here? is this `agentMap[currenGladiator.name]`?
+            // TODO: can we use agentId here? Like, is this `agentMap[currenGladiator.name]`? 
+            // Or do we create the agentMap above with UUID as key? 
+            // If so, the values should be the address and name, or more info should be there?
             "ebeabd78-5beb-01b2-a37b-38a7b31a8858",
             {
               roomId: roomId,

@@ -163,6 +163,7 @@ export function createMemories(judge: AgentRuntime, roomId: UUID, messages: Mess
   const memoryManager = judge.getMemoryManager("memory");
   for (const message of messages) {
     const memory: Memory = {
+      // TODO: who's the user in this case since we are feeding memories to the judge
       userId: "0-0-0-0-0",
       agentId: message.sender,
       content: { text: message.content },
