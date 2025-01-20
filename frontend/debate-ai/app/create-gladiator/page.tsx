@@ -205,7 +205,7 @@ const CreateGladiator = () => {
                     <div className="relative">
                       {!isConnected ? (
                         <div className="text-center p-4 bg-[#1a1a1a]/60 text-[#ffffff] rounded-md border ">
-                          Please connect your wallet to create a debate
+                          Please connect your wallet to create a gladiator
                         </div>
                       ) : (
                         <div className="relative">
