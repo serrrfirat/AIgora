@@ -12,6 +12,8 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { Message } from '../types/message';
 import { Redis } from 'ioredis';
 import { v4 as uuid } from "uuid";
+import { decryptMessage, generateKeyPair } from '../helpers/crypto';
+import crypto from "crypto";
 
 export class CoordinatorService {
   private redis: Redis;
@@ -22,6 +24,8 @@ export class CoordinatorService {
   private agentClient: AgentClient;
   private wss: WebSocketServer;
   private chatConnections: Map<string, Set<WebSocket>>;
+  private privateKey: crypto.KeyObject;
+  publicKey: crypto.KeyObject;
 
   constructor() {
     if (!process.env.RPC_URL) throw new Error('RPC_URL environment variable is not set');
@@ -71,6 +75,11 @@ export class CoordinatorService {
         }
       });
     });
+
+    // Store a private key to decode locations and a public key someone can use to encode a message
+    const { privateKey, publicKey } = generateKeyPair();
+    this.privateKey = privateKey;
+    this.publicKey = publicKey;
   }
 
   async initialize() {
@@ -221,6 +230,55 @@ export class CoordinatorService {
     });
 
     return unwatch;
+  }
+
+  /**
+   * Listens to the contract emiting the event that an agent's location has been shared.
+   * The event contains two arguments: the market's id and the location.
+   * The location is encrypted, so the coordinator needs the It's encrypted using the 
+   * @returns if the event-watching has stopped
+   */
+  private async startListeningLocations() {
+    const unwatch = await this.wsClient.watchContractEvent({
+      address: MARKET_FACTORY_ADDRESS,
+      abi: MARKET_FACTORY_ABI,
+      eventName: 'LocationShared',
+      onLogs: async (logs) => {
+        for (const log of logs) {
+          // FIXME: similar to above? or do we have the markets or the debate IDs?
+          const debateId = log.args.debateId;
+          const location = log.args.location;
+          if (!debateId || location === undefined) continue;
+
+          const locationDec = this.decodeLocation(location);
+          console.log(`Location shared for debate ${debateId}. Agent is at ${locationDec}`);
+
+          const market = await this.getMarketDetails(debateId);
+          if (!market) continue;
+
+          // Join the agent at the location into the debate.
+          // TODO: join the agent
+        }
+      },
+    });
+
+    return unwatch;
+  }
+
+  /**
+   * @param location - the location encoded with the public key
+   * @returns the decoded string representing the location
+   */
+  private decodeLocation(location: string) {
+    const decryptedLocation = decryptMessage(location, this.privateKey);
+    return decryptedLocation
+  }
+
+  /**
+   * @returns the public key for the coordinator for others to encrypt.
+   */
+  getPublicKey() {
+    return this.publicKey
   }
 
   private async handleBondingComplete(marketId: bigint) {
