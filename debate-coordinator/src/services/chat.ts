@@ -222,4 +222,27 @@ export class ChatService {
       await new Promise(resolve => setTimeout(resolve, 5000));
     }
   }
+
+  /**
+   * @param debateId - the debate in which the judge will decide the winner
+   */
+  async sendMessagesToJudge(debateId: bigint): Promise<void> {
+    // Get room ID for this debate
+    const roomId = await this.getRoomIdByDebateId(debateId);
+    if (!roomId) {
+      throw new Error(`No chat room found for debate ${debateId}`);
+    }
+    // Get all the messages formated with sender and content.
+    const messages = await this.getMessages(debateId);
+    const formatted_messages = messages.map((msg, _index, _array) => { return JSON.stringify({ sender: msg.sender, content: msg.content }) }).toString();
+    // Send messages to judge agent.
+    await this.agentClient.sendMessage(
+      "marcus_aurelius",
+      {
+        roomId: roomId,
+        userId: "marcus_aiurelius",
+        text: formatted_messages,
+      }
+    );
+  }
 } 

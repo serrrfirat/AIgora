@@ -223,7 +223,7 @@ export class CoordinatorService {
           const market = await this.getMarketDetails(marketId);
           if (!market) continue;
 
-          // Round complete, send the message to Marcus AIrelius
+          // Round complete, send the message to Marcus AIurelius
           await this.handleRoundEnded(marketId, roundIndex);
         }
       },
@@ -344,7 +344,6 @@ export class CoordinatorService {
         return;
       }
 
-
       /// Call Marcus AIurelius to the debate
       const judge = await this.getJudge(marketId);
       await this.chatService.joinChatRoom(
@@ -352,9 +351,11 @@ export class CoordinatorService {
         judge.name,
       );
 
-      const marcusRequest = await this.scraper.sendTweet(`Marcus AIrelius, the judge, please deliver the verdict of this round. The topic is "${debate.topic}" and the gladiators are ${gladiators.map(g => g.name).join(', ')}. The timestamp is ${round.endTime}`);
-
-
+      // Announce the entrance
+      const enterMessage = "Marcus AIurelius has joined the chat and will judge your debate, selecting one winner among all.";
+      this.chatService.sendMessage(market.debateId, "God", enterMessage);
+      // Use the chat to pàss everything to the judge
+      this.chatService.sendMessagesToJudge(market.debateId);
     } catch (error) {
       console.error('Error handling round ended:', error);
     }
