@@ -24,6 +24,10 @@ const Navbar = () => {
     window.location.href = `/create-gladiator`;
   };
 
+  const handleHomeClick = () => {
+    window.location.href = `/`;
+  };
+
   useEffect(() => {
     const controlNavbar = () => {
       if (typeof window !== "undefined") {
@@ -58,7 +62,10 @@ const Navbar = () => {
         >
           {/* Logo and Hamburger Container */}
           <div className="flex-1 items-center gap-2">
-            <div className="text-white text-lg sm:text-2xl font-bold pixelated">
+            <div
+              className="text-white text-lg sm:text-2xl font-bold pixelated cursor-pointer"
+              onClick={() => handleHomeClick()}
+            >
               AIgora
             </div>
             {/* Hamburger Menu (Visible on small screens) */}
