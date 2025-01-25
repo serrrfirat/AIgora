@@ -13,6 +13,7 @@ contract MarketFactory is ReentrancyGuard, OwnableRoles {
     uint256 public constant MIN_PRICE = 1; // $0.01 in basis points
     uint256 public constant MAX_PRICE = 9900; // $0.99 in basis points
     uint256 public constant MIN_ORDER_SIZE = 10**18; // 1 full token
+    uint256 public constant MAX_GLADIATORS_IN_MARKET = 10;
 
     // Structs
     struct BondingCurve {
@@ -191,8 +192,9 @@ contract MarketFactory is ReentrancyGuard, OwnableRoles {
         require(_token != address(0), "Invalid token");
         require(_judgeAI != address(0), "Invalid judge AI");
         require(debateIdToMarketId[_debateId] == 0, "Market exists");
-        require(_bondingTarget > 0, "Invalid bonding target");
+        require(_bondingTarget > 0, "Invalid target");
         require(_bondingDuration > 0, "Invalid bonding duration");
+        require(marketCount < MAX_GLADIATORS_IN_MARKET, "Max participants");
 
         marketId = marketCount++;
         Market storage market = markets[marketId];

@@ -22,7 +22,14 @@ coverage/
 .DS_Store
 Thumbs.db 
 
-characters/
-cookies/
+# Data
+data/
+content_cache/
 
+# Cache
+cache/
+
+# Logs
 pipeline/
+cookies
+characters

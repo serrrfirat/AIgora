@@ -32,7 +32,7 @@ export class CoordinatorService {
       lazyConnect: true  // Don't connect immediately
     });
     this.agentClient = new AgentClient();
-    this.wss = new WebSocketServer({ port: 3004 });
+    this.wss = new WebSocketServer({ port: Number(process.env.WS_PORT) || 3004 });
     this.chatConnections = new Map();
     this.chatService = new ChatService(
       this.redis, 
