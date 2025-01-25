@@ -150,3 +150,41 @@ body {
 .animate-blink {
   animation: blink 2s infinite ease-in-out;
 }
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #2a1b15;
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #d1bb9e20;
+  border-radius: 4px;
+  border: 2px solid #2a1b15;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #d1bb9e40;
+}
+
+.custom-scrollbar-main::-webkit-scrollbar {
+  width: 8px;
+}
+
+.custom-scrollbar-main::-webkit-scrollbar-track {
+  background: #4d3328;
+  border-radius: 4px;
+}
+
+.custom-scrollbar-main::-webkit-scrollbar-thumb {
+  background: #e3e2e2;
+  border-radius: 4px;
+  border: 2px solid #4d3328;
+}
+
+.custom-scrollbar-main::-webkit-scrollbar-thumb:hover {
+  background: #e3e2e2;
+}
