@@ -3,10 +3,6 @@
   "version": "1.0.0",
   "description": "Debate coordinator service for AI debates",
   "main": "dist/app.js",
-  "type": "module",
-  "engines": {
-    "node": ">=20.0.0"
-  },
   "scripts": {
     "build": "tsc",
     "start": "node dist/app.js",
