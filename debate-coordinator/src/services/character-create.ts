@@ -1,14 +1,7 @@
-import type { Helia } from 'helia'
-import { createHelia } from 'helia'
-import type { Strings } from '@helia/strings'
-import { strings } from '@helia/strings'
-import { json } from '@helia/json'
 import { TweetProcessor } from '../scrapper/character/GenerateCharacter';
 import TwitterPipeline from '../scrapper/twitter/TwitterPipeline.js';
 
 export class CharacterCreateService {
-  private ipfs: Helia
-  private ipfsStrings: Strings
   private ipfsJson: any
 
   constructor() {
@@ -16,16 +9,16 @@ export class CharacterCreateService {
   }
 
   private async initializeIPFS() {
-    this.ipfs = await createHelia()
-    this.ipfsStrings = strings(this.ipfs)
-    this.ipfsJson = json(this.ipfs)
+    // this.ipfs = await createHelia()
+    // this.ipfsStrings = strings(this.ipfs)
+    // this.ipfsJson = json(this.ipfs)
   }
 
-  private async uploadToIPFS(metadata: any): Promise<string> {
-    const metadataString = JSON.stringify(metadata)
-    const cid = await this.ipfsJson.add(metadataString)
-    return `ipfs://${cid.toString()}`
-  }
+  // private async uploadToIPFS(metadata: any): Promise<string> {
+  //   const metadataString = JSON.stringify(metadata)
+  //   const cid = await this.ipfsJson.add(metadataString)
+  //   return `ipfs://${cid.toString()}`
+  // }
 
   async generateCharacterFromTwitter(username: string): Promise<any> {
     try {
@@ -59,14 +52,14 @@ export class CharacterCreateService {
 
       // Upload to IPFS
       console.log('Uploading to IPFS...');
-      const ipfsHash = await this.uploadToIPFS(metadata);
-      console.log('IPFS upload complete:', ipfsHash);
+      // const ipfsHash = await this.uploadToIPFS(metadata);
+      // console.log('IPFS upload complete:', ipfsHash);
       
       return {
         success: true,
         data: {
           ...characterData,
-          ipfsUrl: ipfsHash
+          // ipfsUrl: ipfsHash
         }
       };
     } catch (error) {
