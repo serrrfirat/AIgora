@@ -41,7 +41,7 @@
     "ora": "^8.1.1",
     "path": "0.12.7",
     "progress": "^2.0.3",
-    "puppeteer": "^21.5.0",
+    "puppeteer": "^22.0.0",
     "puppeteer-cluster": "^0.24.0",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-adblocker": "^2.13.6",
