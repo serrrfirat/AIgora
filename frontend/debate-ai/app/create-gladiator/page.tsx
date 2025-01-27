@@ -102,24 +102,25 @@ const CreateGladiator = () => {
         }
 
         const characterData = await response.json();
-
+        console.log("characterData name", characterData.name);
+        console.log("characterData bio", characterData.bio);
         // Transform the character data into the GeneratedGladiator format
         const gladiatorData: GeneratedGladiator = {
-          name: characterData.data.name,
+          name: characterData.name,
           image:
             process.env.NEXT_PUBLIC_DEFAULT_GLADIATOR_IMAGE ||
             "/placeholder-gladiator.png",
-          description: characterData.data.bio.join(" "),
-          speciality: characterData.data.topics[0] || "General Philosophy",
+          description: characterData.bio.join(" "),
+          speciality: characterData.topics[0] || "General Philosophy",
           stats: {
-            strength: Math.min(100, characterData.data.topics.length * 20),
-            agility: Math.min(100, characterData.data.postExamples.length * 5),
+            strength: Math.min(100, characterData.topics.length * 20),
+            agility: Math.min(100, characterData.postExamples.length * 5),
             intelligence: Math.min(
               100,
-              characterData.data.adjectives.length * 25
+              characterData.adjectives.length * 25
             ),
           },
-          ipfsUrl: characterData.data.ipfsUrl,
+          ipfsUrl: characterData.ipfsUrl,
         };
 
         setGladiator(gladiatorData);
