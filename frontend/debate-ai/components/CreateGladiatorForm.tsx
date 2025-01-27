@@ -58,17 +58,22 @@ export function CreateGladiatorForm() {
         }
         
         const characterData = await response.json()
-        
+
+        // Add validation
+        if (!characterData?.data?.name) {
+          throw new Error('Invalid character data structure');
+        }
+
         // Transform the character data into the GeneratedGladiator format
         const gladiatorData: GeneratedGladiator = {
-          name: characterData.data.name,
+          name: characterData.data.name || 'Unknown Gladiator',
           image: process.env.NEXT_PUBLIC_DEFAULT_GLADIATOR_IMAGE || '/placeholder-gladiator.png',
-          description: characterData.data.bio.join(' '),
-          speciality: characterData.data.topics[0] || 'General Philosophy',
+          description: characterData.data.bio?.join(' ') || 'No description available',
+          speciality: characterData.data.topics?.[0] || 'General Philosophy',
           stats: {
-            strength: Math.min(100, (characterData.data.topics.length * 20)),
-            agility: Math.min(100, (characterData.data.postExamples.length * 5)),
-            intelligence: Math.min(100, (characterData.data.adjectives.length * 25))
+            strength: Math.min(100, (characterData.data.topics?.length || 0) * 20),
+            agility: Math.min(100, (characterData.data.postExamples?.length || 0) * 5),
+            intelligence: Math.min(100, (characterData.data.adjectives?.length || 0) * 25)
           },
           ipfsUrl: characterData.data.ipfsUrl
         }

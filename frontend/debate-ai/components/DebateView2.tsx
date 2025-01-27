@@ -5,13 +5,15 @@ import {
   DEBATE_FACTORY_ABI,
   MARKET_FACTORY_ADDRESS,
   MARKET_FACTORY_ABI,
+  GLADIATOR_NFT_ABI,
+  GLADIATOR_NFT_ADDRESS,
 } from "@/config/contracts";
 import {
   useAccount,
   useReadContract,
   useWriteContract,
   useWaitForTransactionReceipt,
-  useClient,
+  usePublicClient,
 } from "wagmi";
 import { formatEther, formatAddress } from "@/lib/utils";
 import { useState, useEffect } from "react";
@@ -74,6 +76,7 @@ type Gladiator = {
   index: bigint; // Index in gladiators array
   isActive: boolean; // Whether still in competition
   publicKey: string; // Public key for encrypted bribes
+  tokenId: number; // Token ID of the NFT - making this required instead of optional
 };
 
 type JudgeVerdict = {
@@ -155,7 +158,7 @@ interface DebateViewProps {
 
 export function DebateView2({ debateId }: DebateViewProps) {
   const { isConnected, address } = useAccount();
-  const publicClient = useClient({ config });
+  const publicClient = usePublicClient();
 
   // Component state
   const [pendingTx, setPendingTx] = useState(false);
@@ -601,21 +604,23 @@ export function DebateView2({ debateId }: DebateViewProps) {
       const price = isLong
         ? bondingCurve.basePrice
         : 10000n - bondingCurve.basePrice;
-      console.log("Base price:", bondingCurve.basePrice.toString());
-      console.log("Calculated price:", price.toString());
 
+      // Ensure marketId is properly converted to bigint
+      const marketIdBigInt = BigInt(marketId);
+
+      // Safe logging with null checks
       console.log("Placing order with params:", {
-        marketId: marketId.toString(),
-        outcomeIndex: outcomeIndex.toString(),
-        price: price.toString(),
-        amountInWei: amountInWei.toString(),
+        marketId: marketIdBigInt,
+        outcomeIndex: outcomeIndex,
+        price: price,
+        amountInWei: amountInWei,
       });
 
       await placeLimitOrder({
         address: MARKET_FACTORY_ADDRESS as `0x${string}`,
         abi: MARKET_FACTORY_ABI,
         functionName: "placeLimitOrder",
-        args: [marketId, outcomeIndex, price, amountInWei],
+        args: [marketIdBigInt, outcomeIndex, price, amountInWei],
       });
     } catch (error) {
       console.error("Error placing order:", error);
@@ -645,11 +650,104 @@ export function DebateView2({ debateId }: DebateViewProps) {
     handleAmountChange(newAmount.toString());
   };
 
-  console.log("marketDetails", marketDetails);
-  console.log("gladiators", gladiators);
-  console.log("gladiatorPrices", gladiatorPrices);
-  console.log("bondingCurveDetails", bondingCurveDetails);
-  console.log("debateDetails", debateDetails);
+  // Add new state for nomination modal
+  const [isNominationModalOpen, setIsNominationModalOpen] = useState(false);
+
+  // Add state for user's gladiators
+  const [userGladiators, setUserGladiators] = useState<Gladiator[]>([]);
+
+  // Get all gladiators
+  const { data: allGladiators, refetch: refetchAllGladiators } = useReadContract({
+    address: MARKET_FACTORY_ADDRESS,
+    abi: MARKET_FACTORY_ABI,
+    functionName: "getAllGladiators",
+  }) as { data: Gladiator[] | undefined; refetch: () => void };
+
+  // Add contract write for nomination
+  const {
+    data: nominateHash,
+    isPending: isNominatePending,
+    writeContract: nominateGladiator
+  } = useWriteContract();
+
+  // Add hook for checking ownership
+  const { data: ownershipData } = useReadContract({
+    address: GLADIATOR_NFT_ADDRESS,
+    abi: GLADIATOR_NFT_ABI,
+    functionName: "ownerOf",
+    args: selectedGladiator?.tokenId ? [BigInt(selectedGladiator.tokenId)] : undefined,
+  });
+
+  // Effect to filter user's gladiators
+  useEffect(() => {
+    if (allGladiators && address && publicClient) {
+      const fetchUserGladiators = async () => {
+        try {
+          const userOwnedGladiators = await Promise.all(
+            allGladiators.map(async (gladiator, index) => {
+              try {
+                if (!gladiator) return null;
+                
+                // Use multicall to batch ownership checks
+                const ownerData = await publicClient.readContract({
+                  address: GLADIATOR_NFT_ADDRESS,
+                  abi: GLADIATOR_NFT_ABI,
+                  functionName: "ownerOf",
+                  args: [BigInt(index + 1)], // tokenIds start from 1
+                });
+                
+                const owner = ownerData as string;
+                
+                if (owner && owner.toLowerCase() === address.toLowerCase()) {
+                  const tokenId = index + 1;
+                  return {
+                    ...gladiator,
+                    tokenId,
+                    name: gladiator.name || `Gladiator #${tokenId}`
+                  } as Gladiator;
+                }
+              } catch (error) {
+                console.error(`Error checking ownership for gladiator ${index + 1}:`, error);
+              }
+              return null;
+            })
+          );
+          
+          const validGladiators = userOwnedGladiators.filter((g): g is Gladiator => 
+            g !== null && 
+            typeof g === 'object' && 
+            'tokenId' in g && 
+            typeof g.tokenId === 'number'
+          );
+          
+          setUserGladiators(validGladiators);
+        } catch (error) {
+          console.error("Error fetching user gladiators:", error);
+          setUserGladiators([]);
+        }
+      };
+      
+      fetchUserGladiators();
+    } else {
+      setUserGladiators([]);
+    }
+  }, [allGladiators, address, publicClient]);
+
+  const handleNominate = async (tokenId: number | undefined) => {
+    if (!marketId || !tokenId) return;
+    
+    try {
+      await nominateGladiator({
+        address: MARKET_FACTORY_ADDRESS,
+        abi: MARKET_FACTORY_ABI,
+        functionName: "nominateGladiator",
+        args: [BigInt(tokenId), marketId],
+      });
+      setIsNominationModalOpen(false);
+    } catch (error) {
+      console.error("Error nominating gladiator:", error);
+    }
+  };
 
   return (
     <>
@@ -891,8 +989,25 @@ export function DebateView2({ debateId }: DebateViewProps) {
                     <div className="space-y-4">
                       {/* Header with dividers */}
                       <div className="border-y border-[#D1BB9E]/20">
-                        <div className="grid grid-cols-[2fr,1fr,1fr,1fr] gap-4 px-2 py-3 text-lg text-[#E6D5C3]">
-                          <div>Gladiator</div>
+                        <div className="grid grid-cols-[2fr,1fr,1fr,1fr] gap-4 px-2 py-3 text-lg text-[#E6D5C3] items-center">
+                          <div className="flex items-center gap-3">
+                            <span>Gladiator</span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-xs bg-[#2A1B15] text-[#FFD700] border-[#FFD700]/30 hover:bg-[#FFD700]/20 hover:border-[#FFD700]/50 transition-colors"
+                              disabled={!isConnected}
+                              onClick={() => {
+                                if (!isConnected) {
+                                  // Handle not connected case
+                                  return;
+                                }
+                                setIsNominationModalOpen(true);
+                              }}
+                            >
+                              + Nominate
+                            </Button>
+                          </div>
                           <div className="text-right">Volume</div>
                           <div className="text-right">Probability</div>
                         </div>
@@ -900,12 +1015,13 @@ export function DebateView2({ debateId }: DebateViewProps) {
 
                       {/* Rows */}
                       <div className="space-y-2">
-                        {gladiators?.map((gladiator, index) => {
+                        {gladiators?.map((gladiator) => {
+                          if (!gladiator) return null;
                           const currentPrice =
-                            Number(gladiatorPrices?.[index] || 0n) /
+                            Number(gladiatorPrices?.[Number(gladiator.index)] || 0n) /
                             Number(BASIS_POINTS);
                           const volume = gladiatorVolumes
-                            ? formatEther(gladiatorVolumes[index])
+                            ? formatEther(gladiatorVolumes[Number(gladiator.index)])
                             : "0";
                           const totalVolumeFormatted = formatEther(
                             totalVolume || 0n
@@ -938,7 +1054,7 @@ export function DebateView2({ debateId }: DebateViewProps) {
 
                           return (
                             <div
-                              key={gladiator.index.toString()}
+                              key={gladiator.index?.toString() || `gladiator-${gladiator.name}`}
                               className="border-b border-[#D1BB9E]/20 last:border-none"
                             >
                               <div className="grid grid-cols-[2fr,1fr,1fr,1fr] gap-4 px-2 py-4 hover:bg-[#2A1B15] transition-colors items-center rounded-lg">
@@ -1043,24 +1159,28 @@ export function DebateView2({ debateId }: DebateViewProps) {
                         Gladiator
                       </label>
                       <div className="flex flex-col gap-2">
-                        {gladiators?.map((gladiator) => (
-                          <Button
-                            key={gladiator.index.toString()}
-                            variant={
-                              selectedGladiator?.index === gladiator.index
-                                ? "default"
-                                : "outline"
-                            }
-                            className={`w-full justify-start transition-all ${
-                              selectedGladiator?.index === gladiator.index
-                                ? "bg-[#D1BB9E] hover:bg-[#D1BB9E]/90 text-[#3D3D3D]"
-                                : "bg-[#D1BB9E]/50 hover:text-white text-white hover:bg-[#D1BB9E] border-[#D1BB9E]/30"
-                            }`}
-                            onClick={() => setSelectedGladiator(gladiator)}
-                          >
-                            {gladiator.name}
-                          </Button>
-                        ))}
+                        {gladiators?.map((gladiator) => {
+                          if (!gladiator) return null;
+                          
+                          return (
+                            <Button
+                              key={gladiator.index?.toString() || `gladiator-selection-${gladiator.name}`}
+                              variant={
+                                selectedGladiator?.index === gladiator.index
+                                  ? "default"
+                                  : "outline"
+                              }
+                              className={`w-full justify-start transition-all ${
+                                selectedGladiator?.index === gladiator.index
+                                  ? "bg-[#D1BB9E] hover:bg-[#D1BB9E]/90 text-[#3D3D3D]"
+                                  : "bg-[#D1BB9E]/50 hover:text-white text-white hover:bg-[#D1BB9E] border-[#D1BB9E]/30"
+                              }`}
+                              onClick={() => setSelectedGladiator(gladiator)}
+                            >
+                              {gladiator.name}
+                            </Button>
+                          );
+                        })}
                       </div>
                     </div>
 
@@ -1199,13 +1319,16 @@ export function DebateView2({ debateId }: DebateViewProps) {
                         isOrderPending ||
                         isOrderConfirming
                       }
-                      onClick={() =>
-                        selectedGladiator &&
+                      onClick={() => {
+                        if (!selectedGladiator?.index) {
+                          console.error("No gladiator selected or invalid index");
+                          return;
+                        }
                         handlePlaceLimitOrder(
-                          selectedGladiator.index,
+                          selectedGladiator.index,  // This is the outcomeIndex
                           orderType === "buy"
-                        )
-                      }
+                        );
+                      }}
                     >
                       {!isConnected
                         ? "Connect Wallet"
@@ -1275,24 +1398,28 @@ export function DebateView2({ debateId }: DebateViewProps) {
                             Gladiator
                           </label>
                           <div className="flex flex-col gap-2">
-                            {gladiators?.map((gladiator) => (
-                              <Button
-                                key={gladiator.index.toString()}
-                                variant={
-                                  selectedGladiator?.index === gladiator.index
-                                    ? "default"
-                                    : "outline"
-                                }
-                                className={`w-full justify-start transition-all ${
-                                  selectedGladiator?.index === gladiator.index
-                                    ? "bg-[#D1BB9E] hover:bg-[#D1BB9E]/90 text-[#3D3D3D]"
-                                    : "bg-[#D1BB9E]/50 hover:text-white text-white hover:bg-[#D1BB9E] border-[#D1BB9E]/30"
-                                }`}
-                                onClick={() => setSelectedGladiator(gladiator)}
-                              >
-                                {gladiator.name}
-                              </Button>
-                            ))}
+                            {gladiators?.map((gladiator) => {
+                              if (!gladiator) return null;
+                              
+                              return (
+                                <Button
+                                  key={gladiator.index?.toString() || `gladiator-selection-${gladiator.name}`}
+                                  variant={
+                                    selectedGladiator?.index === gladiator.index
+                                      ? "default"
+                                      : "outline"
+                                  }
+                                  className={`w-full justify-start transition-all ${
+                                    selectedGladiator?.index === gladiator.index
+                                      ? "bg-[#D1BB9E] hover:bg-[#D1BB9E]/90 text-[#3D3D3D]"
+                                      : "bg-[#D1BB9E]/50 hover:text-white text-white hover:bg-[#D1BB9E] border-[#D1BB9E]/30"
+                                  }`}
+                                  onClick={() => setSelectedGladiator(gladiator)}
+                                >
+                                  {gladiator.name}
+                                </Button>
+                              );
+                            })}
                           </div>
                         </div>
 
@@ -1410,7 +1537,7 @@ export function DebateView2({ debateId }: DebateViewProps) {
                               {(
                                 (parseFloat(potentialReturn) /
                                   parseFloat(amount || "1")) *
-                                  100 || 0
+                                100 || 0
                               ).toFixed(2)}
                               %)
                             </span>
@@ -1435,13 +1562,16 @@ export function DebateView2({ debateId }: DebateViewProps) {
                             isOrderPending ||
                             isOrderConfirming
                           }
-                          onClick={() =>
-                            selectedGladiator &&
+                          onClick={() => {
+                            if (!selectedGladiator?.index) {
+                              console.error("No gladiator selected or invalid index");
+                              return;
+                            }
                             handlePlaceLimitOrder(
-                              selectedGladiator.index,
+                              selectedGladiator.index,  // This is the outcomeIndex
                               orderType === "buy"
-                            )
-                          }
+                            );
+                          }}
                         >
                           {!isConnected
                             ? "Connect Wallet"
@@ -1453,9 +1583,7 @@ export function DebateView2({ debateId }: DebateViewProps) {
                             ? "Approving..."
                             : isOrderPending || isOrderConfirming
                             ? "Placing Order..."
-                            : `Place ${
-                                orderType === "buy" ? "Buy" : "Sell"
-                              } Order`}
+                            : `Place ${orderType === "buy" ? "Buy" : "Sell"} Order`}
                         </Button>
 
                         <p className="text-xs text-white text-center">
@@ -1503,6 +1631,52 @@ export function DebateView2({ debateId }: DebateViewProps) {
                   ? "Confirming order..."
                   : "Processing..."}
               </p>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Nomination Modal */}
+        <Dialog open={isNominationModalOpen} onOpenChange={setIsNominationModalOpen}>
+          <DialogContent className="sm:max-w-[600px] bg-[#52362B] border-[#D1BB9E]/20">
+            <div className="p-6">
+              <h2 className="text-2xl font-medium text-[#FFD700] mb-6">Select a Gladiator to Nominate</h2>
+              
+              {userGladiators.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-[#E6D5C3]">You don't own any Gladiator NFTs yet.</p>
+                  <Button
+                    className="mt-4 bg-[#D1BB9E] hover:bg-[#D1BB9E]/90 text-[#3D3D3D]"
+                    onClick={() => {
+                      setIsNominationModalOpen(false);
+                      // Add navigation to mint page if you have one
+                    }}
+                  >
+                    Mint a Gladiator
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-4">
+                  {userGladiators.filter(Boolean).map((gladiator) => (
+                    gladiator && (
+                      <div
+                        key={gladiator.tokenId}
+                        className="bg-[#2A1B15] border border-[#D1BB9E]/20 rounded-lg p-4 cursor-pointer hover:border-[#FFD700]/50 transition-all"
+                        onClick={() => handleNominate(gladiator.tokenId)}
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#FFD700]/20 to-[#CCAA00]/20 border border-[#FFD700]/30 flex items-center justify-center">
+                            <span className="text-2xl">🤖</span>
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-medium text-[#E6D5C3]">{gladiator.name || 'Unnamed Gladiator'}</h3>
+                            <p className="text-sm text-[#D1BB9E]/60">Token #{gladiator.tokenId || 'Unknown'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  ))}
+                </div>
+              )}
             </div>
           </DialogContent>
         </Dialog>
