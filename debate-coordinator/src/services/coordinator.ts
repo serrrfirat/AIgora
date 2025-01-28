@@ -76,7 +76,7 @@ export class CoordinatorService {
       });
     });
 
-    // Store a private key to decode locations and a public key someone can use to encode a message
+    // Store a key-pair: public for others to encode locations that will be decode-able by the private key
     const { privateKey, publicKey } = generateKeyPair();
     this.privateKey = privateKey;
     this.publicKey = publicKey;
@@ -95,9 +95,10 @@ export class CoordinatorService {
 
       // Register agent servers from environment variables
       const agentServers = process.env.AGENT_SERVERS ? JSON.parse(process.env.AGENT_SERVERS) : {};
+      console.log("Agent servers to be parsed:", agentServers);
       for (const [_agentId, url] of Object.entries(agentServers)) {
-        const agentUuid = uuid();
-        this.agentClient.registerAgent(agentUuid, url as string);
+        //const agentUuid = uuid();
+        this.agentClient.registerAgent(_agentId, url as string);
       }
     } catch (error) {
       console.error('Error during initialization:', error);

@@ -1,8 +1,8 @@
 import fs from 'fs';
 import { continueMessageHandlerTemplate, evaluationTemplate, factsTemplate, goalsTemplate, shouldRespondTemplate, twitterActionTemplate, twitterMessageHandlerTemplate, twitterPostTemplate, twitterSearchTemplate, twitterShouldRespondTemplate } from './templates.ts';
 import { messageHandlerTemplate } from '@elizaos/client-direct';
-import { AgentRuntime, Memory, UUID } from '@elizaos/core';
-import { parse as parseUuid, stringify, v4 as uuid } from "uuid";
+//import { AgentRuntime, Memory, UUID } from '@elizaos/core';
+//import { parse as parseUuid, stringify, v4 as uuid } from "uuid";
 
 /**
  * Template interface for what's needed for the Twitter agent.
@@ -139,36 +139,36 @@ export function combineObjects<T extends object, U extends object>(obj1: T, obj2
 }
 
 
-/**
- * The least information need to feed memories to an agent.
- *
- * Observe that the `sender` field is different from the 
- * field in the `debate-coordinator`. It uses the UUID from eliza,
- * since the memory manager uses it too.
- */
-interface Message {
-  sender: UUID;
-  content: string;
-}
-
-/**
- * Feeds messages as memories to an already existing agent.
- * Usually used for the judge to get the contents on the debate in memory.
- *
- * @param judge: the agent to use RAG with.
- * @param roomId: the room UUID (as defined in eliza) of the debate.
- * @param messages: the messages that were sent in the room.
- */
-export function createMemories(judge: AgentRuntime, roomId: UUID, messages: Message[]) {
-  const memoryManager = judge.getMemoryManager("memory");
-  for (const message of messages) {
-    const memory: Memory = {
-      // TODO: who's the user in this case since we are feeding memories to the judge
-      userId: "0-0-0-0-0",
-      agentId: message.sender,
-      content: { text: message.content },
-      roomId: roomId,
-    }
-    memoryManager.createMemory(memory)
-  }
-}
+///**
+// * The least information need to feed memories to an agent.
+// *
+// * Observe that the `sender` field is different from the 
+// * field in the `debate-coordinator`. It uses the UUID from eliza,
+// * since the memory manager uses it too.
+// */
+//interface Message {
+//  sender: UUID;
+//  content: string;
+//}
+//
+///**
+// * Feeds messages as memories to an already existing agent.
+// * Usually used for the judge to get the contents on the debate in memory.
+// *
+// * @param judge: the agent to use RAG with.
+// * @param roomId: the room UUID (as defined in eliza) of the debate.
+// * @param messages: the messages that were sent in the room.
+// */
+//export function createMemories(judge: AgentRuntime, roomId: UUID, messages: Message[]) {
+//  const memoryManager = judge.getMemoryManager("memory");
+//  for (const message of messages) {
+//    const memory: Memory = {
+//      // TODO: who's the user in this case since we are feeding memories to the judge
+//      userId: "0-0-0-0-0",
+//      agentId: message.sender,
+//      content: { text: message.content },
+//      roomId: roomId,
+//    }
+//    memoryManager.createMemory(memory)
+//  }
+//}
