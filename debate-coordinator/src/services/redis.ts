@@ -1,20 +1,27 @@
 import { createClient } from 'redis';
 import { Market, Round, Gladiator } from '../types/market';
 import { AgentMessage, JudgeVerdict } from '../types/agent';
+import Redis from 'ioredis';
 
 export class RedisService {
-  private client;
+  private client: Redis;
 
   constructor() {
-    this.client = createClient({
-      url: process.env.REDIS_PUBLIC_URL || 'redis://localhost:6379'
+    this.client = new Redis(process.env.REDIS_URL + '?family=0');
+
+
+    this.client.on('error', (err) => {
+      console.error('Redis Client Error:', err);
     });
 
-    this.client.on('error', (err) => console.error('Redis Client Error', err));
+    this.client.on('connect', () => {
+      console.log('Successfully connected to Redis');
+    });
   }
 
   async connect() {
-    await this.client.connect();
+    // Connection is handled automatically by ioredis
+    return this.client.ping();
   }
 
   async disconnect() {
@@ -105,12 +112,12 @@ export class RedisService {
   // Message methods
   async addMessage(marketId: bigint, roundIndex: number, message: AgentMessage) {
     const key = `market:${marketId}:round:${roundIndex}:messages`;
-    await this.client.rPush(key, JSON.stringify(message));
+    await this.client.rpush(key, JSON.stringify(message));
   }
 
   async getMessages(marketId: bigint, roundIndex: number): Promise<AgentMessage[]> {
     const key = `market:${marketId}:round:${roundIndex}:messages`;
-    const data = await this.client.lRange(key, 0, -1);
+    const data = await this.client.lrange(key, 0, -1);
     return data.map(msg => JSON.parse(msg));
   }
 
