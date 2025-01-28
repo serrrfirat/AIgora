@@ -577,7 +577,7 @@ export function DebateView2({ debateId }: DebateViewProps) {
     }
     return false;
   };
-
+  console.log("Bonding curve", bondingCurve);
   const handlePlaceLimitOrder = async (
     outcomeIndex: bigint,
     isLong: boolean
@@ -604,9 +604,12 @@ export function DebateView2({ debateId }: DebateViewProps) {
       const price = isLong
         ? bondingCurve.basePrice
         : 10000n - bondingCurve.basePrice;
-
+      if (!marketId) {
+        console.error("Market ID is required");
+        return;
+      }
       // Ensure marketId is properly converted to bigint
-      const marketIdBigInt = BigInt(marketId);
+      const marketIdBigInt = BigInt(marketId as string);
 
       // Safe logging with null checks
       console.log("Placing order with params:", {
@@ -1655,7 +1658,7 @@ export function DebateView2({ debateId }: DebateViewProps) {
               
               {userGladiators.length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-[#E6D5C3]">You don't own any Gladiator NFTs yet.</p>
+                  <p className="text-[#E6D5C3]">You don&apos;t own any Gladiator NFTs yet.</p>
                   <Button
                     className="mt-4 bg-[#D1BB9E] hover:bg-[#D1BB9E]/90 text-[#3D3D3D]"
                     onClick={() => {
