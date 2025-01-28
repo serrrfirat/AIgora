@@ -16,7 +16,7 @@ import {
   usePublicClient,
 } from "wagmi";
 import { formatEther, formatAddress } from "@/lib/utils";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -749,6 +749,11 @@ export function DebateView2({ debateId }: DebateViewProps) {
     }
   };
 
+  // Add index mapping
+  const indexedGladiators = useMemo(() => {
+    return gladiators?.map((g, index) => ({ ...g, index: BigInt(index) })) || [];
+  }, [gladiators]);
+
   return (
     <>
       {/* <Navbar /> */}
@@ -1015,7 +1020,7 @@ export function DebateView2({ debateId }: DebateViewProps) {
 
                       {/* Rows */}
                       <div className="space-y-2">
-                        {gladiators?.map((gladiator) => {
+                        {indexedGladiators.map((gladiator, index) => {
                           if (!gladiator) return null;
                           const currentPrice =
                             Number(gladiatorPrices?.[Number(gladiator.index)] || 0n) /
@@ -1033,7 +1038,7 @@ export function DebateView2({ debateId }: DebateViewProps) {
                                     Number(totalVolumeFormatted)) *
                                   100
                                 ).toFixed(1)
-                              : "0";
+                            : currentPrice.toFixed(1);
 
                           const impliedProbability =
                             totalVolumeFormatted !== "0"
@@ -1042,7 +1047,7 @@ export function DebateView2({ debateId }: DebateViewProps) {
                                     Number(totalVolumeFormatted)) *
                                   100
                                 ).toFixed(1)
-                              : currentPrice.toFixed(1);
+                            : currentPrice.toFixed(1);
 
                           const yesPrice = (
                             Number(impliedProbability) / 100
@@ -1054,7 +1059,7 @@ export function DebateView2({ debateId }: DebateViewProps) {
 
                           return (
                             <div
-                              key={gladiator.index?.toString() || `gladiator-${gladiator.name}`}
+                              key={index}
                               className="border-b border-[#D1BB9E]/20 last:border-none"
                             >
                               <div className="grid grid-cols-[2fr,1fr,1fr,1fr] gap-4 px-2 py-4 hover:bg-[#2A1B15] transition-colors items-center rounded-lg">
@@ -1085,6 +1090,7 @@ export function DebateView2({ debateId }: DebateViewProps) {
                                     size="sm"
                                     className="px-3 py-1 h-auto bg-[#2A1B15] text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20 hover:border-emerald-500/50 transition-colors"
                                     onClick={() => {
+                                      console.log("gladiator", gladiator);
                                       setSelectedGladiator(gladiator);
                                       setOrderType("buy");
                                       setAmount("1");
@@ -1159,12 +1165,12 @@ export function DebateView2({ debateId }: DebateViewProps) {
                         Gladiator
                       </label>
                       <div className="flex flex-col gap-2">
-                        {gladiators?.map((gladiator) => {
+                        {indexedGladiators.map((gladiator, index) => {
                           if (!gladiator) return null;
                           
                           return (
                             <Button
-                              key={gladiator.index?.toString() || `gladiator-selection-${gladiator.name}`}
+                              key={index}
                               variant={
                                 selectedGladiator?.index === gladiator.index
                                   ? "default"
@@ -1175,7 +1181,10 @@ export function DebateView2({ debateId }: DebateViewProps) {
                                   ? "bg-[#D1BB9E] hover:bg-[#D1BB9E]/90 text-[#3D3D3D]"
                                   : "bg-[#D1BB9E]/50 hover:text-white text-white hover:bg-[#D1BB9E] border-[#D1BB9E]/30"
                               }`}
-                              onClick={() => setSelectedGladiator(gladiator)}
+                              onClick={() => {
+                                setSelectedGladiator(gladiator);
+                                console.log("gladiator", gladiator);
+                              }}
                             >
                               {gladiator.name}
                             </Button>
@@ -1320,7 +1329,8 @@ export function DebateView2({ debateId }: DebateViewProps) {
                         isOrderConfirming
                       }
                       onClick={() => {
-                        if (!selectedGladiator?.index) {
+                        console.log("selectedGladiator with index", selectedGladiator?.index);
+                        if (typeof selectedGladiator?.index === 'undefined') {
                           console.error("No gladiator selected or invalid index");
                           return;
                         }
@@ -1353,7 +1363,7 @@ export function DebateView2({ debateId }: DebateViewProps) {
           </div>
 
           {/* Mobile/Tablet Drawer - Visible on smaller screens */}
-          <div className="fixed md:hidden bottom-6 right-6 z-50">
+          <div className="fixed md:bottom-6 right-6 z-50">
             <Drawer>
               <DrawerTrigger asChild>
                 <Button
@@ -1398,12 +1408,11 @@ export function DebateView2({ debateId }: DebateViewProps) {
                             Gladiator
                           </label>
                           <div className="flex flex-col gap-2">
-                            {gladiators?.map((gladiator) => {
+                            {indexedGladiators.map((gladiator, index) => {
                               if (!gladiator) return null;
-                              
                               return (
                                 <Button
-                                  key={gladiator.index?.toString() || `gladiator-selection-${gladiator.name}`}
+                                  key={index}
                                   variant={
                                     selectedGladiator?.index === gladiator.index
                                       ? "default"
@@ -1414,7 +1423,10 @@ export function DebateView2({ debateId }: DebateViewProps) {
                                       ? "bg-[#D1BB9E] hover:bg-[#D1BB9E]/90 text-[#3D3D3D]"
                                       : "bg-[#D1BB9E]/50 hover:text-white text-white hover:bg-[#D1BB9E] border-[#D1BB9E]/30"
                                   }`}
-                                  onClick={() => setSelectedGladiator(gladiator)}
+                                  onClick={() => {
+                                    setSelectedGladiator(gladiator);
+                                    console.log("gladiator", gladiator);
+                                  }}
                                 >
                                   {gladiator.name}
                                 </Button>
@@ -1537,7 +1549,7 @@ export function DebateView2({ debateId }: DebateViewProps) {
                               {(
                                 (parseFloat(potentialReturn) /
                                   parseFloat(amount || "1")) *
-                                100 || 0
+                                  100 || 0
                               ).toFixed(2)}
                               %)
                             </span>
@@ -1563,7 +1575,8 @@ export function DebateView2({ debateId }: DebateViewProps) {
                             isOrderConfirming
                           }
                           onClick={() => {
-                            if (!selectedGladiator?.index) {
+                          console.log("selectedGladiator with index", selectedGladiator);
+                            if (typeof selectedGladiator?.index === 'undefined') {
                               console.error("No gladiator selected or invalid index");
                               return;
                             }
@@ -1585,7 +1598,6 @@ export function DebateView2({ debateId }: DebateViewProps) {
                             ? "Placing Order..."
                             : `Place ${orderType === "buy" ? "Buy" : "Sell"} Order`}
                         </Button>
-
                         <p className="text-xs text-white text-center">
                           By trading, you agree to the Terms of Use.
                         </p>
@@ -1684,3 +1696,4 @@ export function DebateView2({ debateId }: DebateViewProps) {
     </>
   );
 }
+
