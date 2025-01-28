@@ -31,7 +31,7 @@ export class CoordinatorService {
     this.wss = new WebSocketServer({ port: Number(process.env.WS_PORT) || 3004 });
     this.chatConnections = new Map();
     this.chatService = new ChatService(
-      this.redis, 
+      this.redis,
       this.agentClient,
       this.broadcastChatMessage.bind(this)
     );
@@ -207,13 +207,34 @@ export class CoordinatorService {
           if (!marketId || roundIndex === undefined) continue;
 
           console.log(`Round started for market ${marketId}, round ${roundIndex}`);
-          
+
           // Get debate ID
           const market = await this.getMarketDetails(marketId);
           if (!market) continue;
 
           // Round complete, send the message to Marcus AIrelius
           await this.handleRoundEnded(marketId, roundIndex);
+        }
+      },
+    });
+
+    return unwatch;
+  }
+
+  private async startListeningNominations() {
+    const unwatch = await this.wsClient.watchContractEvent({
+      address: MARKET_FACTORY_ADDRESS,
+      abi: MARKET_FACTORY_ABI,
+      eventName: 'Nomination',
+      onLogs: async (_logs) => {
+        for (const log of _logs) {
+          const debateId = log.args.debateId;
+          const agentAddress = log.args.agent;
+          if (!debateId || agentAddress === undefined) continue;
+
+          console.log(`Nomination for debate ${debateId} for ${agentAddress}`);
+
+          // TODO: join the room?
         }
       },
     });
@@ -254,37 +275,37 @@ export class CoordinatorService {
     }
   }
 
-  private async handleRoundEnded(marketId: bigint, roundIndex: number){
+  private async handleRoundEnded(marketId: bigint, roundIndex: number) {
     try {
       console.log(`Handling round ended for market ${marketId} and round ${roundIndex}`);
 
-    const round = await this.getCurrentRound(marketId);
-    if (!round) {
-      console.error(`Round ${roundIndex} not found for market ${marketId}`);
-      return;
-    }
-    // Get market details
-    const market = await this.getMarketDetails(marketId);
-    if (!market) {
-      console.error(`Market ${marketId} not found`);
-      return;
-    }
+      const round = await this.getCurrentRound(marketId);
+      if (!round) {
+        console.error(`Round ${roundIndex} not found for market ${marketId}`);
+        return;
+      }
+      // Get market details
+      const market = await this.getMarketDetails(marketId);
+      if (!market) {
+        console.error(`Market ${marketId} not found`);
+        return;
+      }
 
-    // Get debate details
-    const debate = await this.getDebateDetails(market.debateId);
-    if (!debate) {
-      console.error(`Debate ${market.debateId} not found`);
-      return;
-    }
+      // Get debate details
+      const debate = await this.getDebateDetails(market.debateId);
+      if (!debate) {
+        console.error(`Debate ${market.debateId} not found`);
+        return;
+      }
 
-    // Get gladiators
-    const gladiators = await this.getGladiators(marketId);
-    if (!gladiators || gladiators.length === 0) {
-      console.error(`No gladiators found for market ${marketId}`);
-      return;
-    }
-    /// Call Marcus AIrelius to the thread
-    const marcusRequest = await this.scraper.sendTweet(`Marcus AIrelius, the judge, please deliver the verdict of this round. The topic is "${debate.topic}" and the gladiators are ${gladiators.map(g => g.name).join(', ')}. The timestamp is ${round.endTime}`);
+      // Get gladiators
+      const gladiators = await this.getGladiators(marketId);
+      if (!gladiators || gladiators.length === 0) {
+        console.error(`No gladiators found for market ${marketId}`);
+        return;
+      }
+      /// Call Marcus AIrelius to the thread
+      const marcusRequest = await this.scraper.sendTweet(`Marcus AIrelius, the judge, please deliver the verdict of this round. The topic is "${debate.topic}" and the gladiators are ${gladiators.map(g => g.name).join(', ')}. The timestamp is ${round.endTime}`);
     } catch (error) {
       console.error('Error handling round ended:', error);
     }
@@ -302,7 +323,7 @@ export class CoordinatorService {
       const reader = initialTweetResponse.body.getReader();
       const decoder = new TextDecoder();
       let tweetData = '';
-      
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -331,7 +352,7 @@ export class CoordinatorService {
         // Read the response stream
         const gladReader = gladiatorTweetResponse.body.getReader();
         let gladTweetData = '';
-        
+
         while (true) {
           const { done, value } = await gladReader.read();
           if (done) break;
@@ -381,7 +402,7 @@ export class CoordinatorService {
 
       // Add type checking and proper conversion
       const [token, debateId, resolved, winningGladiator, bondingCurve, totalBondingAmount, judgeAI, currentRound] = data as any[];
-      
+
       return {
         id: marketId,
         token,

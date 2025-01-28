@@ -57,6 +57,7 @@ contract DebateFactory is ReentrancyGuard, OwnableRoles {
     event RoundCompleted(uint256 indexed debateId, uint256 roundNumber, uint256[] totalScores);
     event DebateFinalized(uint256 indexed debateId, uint256 finalOutcome);
     event MarketSet(uint256 indexed debateId, address market);
+    event Nomination(uint256 indexed debateId, address agent);
 
     constructor() {
         _initializeOwner(msg.sender);
@@ -81,7 +82,7 @@ contract DebateFactory is ReentrancyGuard, OwnableRoles {
 
         debateId = debateCount++;
         Debate storage newDebate = debates[debateId];
-        
+
         newDebate.topic = topic;
         newDebate.startTime = block.timestamp;
         newDebate.duration = duration;
@@ -99,20 +100,14 @@ contract DebateFactory is ReentrancyGuard, OwnableRoles {
         // Start first round
         startNewRound(debateId);
 
-        emit DebateCreated(
-            debateId,
-            topic,
-            duration,
-            totalRounds,
-            judges
-        );
+        emit DebateCreated(debateId, topic, duration, totalRounds, judges);
     }
 
-    function scoreRound(uint256 debateId, uint256 roundNumber, uint256[] calldata scores) 
-        external
-        onlyDebateActive(debateId)
-        onlyRoles(_JUDGE_ROLE)
-    {
+    function scoreRound(
+        uint256 debateId,
+        uint256 roundNumber,
+        uint256[] calldata scores
+    ) external onlyDebateActive(debateId) onlyRoles(_JUDGE_ROLE) {
         Debate storage debate = debates[debateId];
         require(scores.length == OUTCOME_COUNT, "Invalid scores length");
         require(roundNumber == debate.currentRound, "Invalid round");
@@ -129,7 +124,7 @@ contract DebateFactory is ReentrancyGuard, OwnableRoles {
         require(totalScore == MAX_SCORE, "Scores must sum to MAX_SCORE");
 
         Round storage round = debate.rounds[roundNumber];
-        
+
         // Record scores for each outcome
         for (uint256 i = 0; i < scores.length; i++) {
             round.judgeScores[msg.sender][i] = scores[i];
@@ -141,14 +136,14 @@ contract DebateFactory is ReentrancyGuard, OwnableRoles {
 
         if (round.judgeCount == REQUIRED_JUDGES) {
             round.isComplete = true;
-            
+
             // Get total scores for event
             uint256[] memory totalScores = new uint256[](OUTCOME_COUNT);
             for (uint256 i = 0; i < OUTCOME_COUNT; i++) {
                 totalScores[i] = round.totalScores[i];
             }
             emit RoundCompleted(debateId, roundNumber, totalScores);
-            
+
             if (debate.currentRound < debate.totalRounds - 1) {
                 startNewRound(debateId);
             } else {
@@ -171,8 +166,10 @@ contract DebateFactory is ReentrancyGuard, OwnableRoles {
         debate.currentRound++;
         Round storage newRound = debate.rounds[debate.currentRound];
         newRound.startTime = block.timestamp;
-        newRound.endTime = block.timestamp + ((debate.debateEndTime - block.timestamp) / (debate.totalRounds - debate.currentRound + 1));
-        
+        newRound.endTime =
+            block.timestamp +
+            ((debate.debateEndTime - block.timestamp) / (debate.totalRounds - debate.currentRound + 1));
+
         emit RoundStarted(debateId, debate.currentRound, block.timestamp);
     }
 
@@ -203,7 +200,7 @@ contract DebateFactory is ReentrancyGuard, OwnableRoles {
         }
 
         require(completedRounds > 0, "No completed rounds");
-        
+
         // Find outcome with highest score
         uint256 maxScore = 0;
         uint256 winningOutcome = 0;
@@ -213,7 +210,7 @@ contract DebateFactory is ReentrancyGuard, OwnableRoles {
                 winningOutcome = i;
             }
         }
-        
+
         return winningOutcome;
     }
 
@@ -227,7 +224,12 @@ contract DebateFactory is ReentrancyGuard, OwnableRoles {
 
     // View functions
 
-    function getDebateDetails(uint256 debateId) external view returns (
+    function getDebateDetails(
+        uint256 debateId
+    )
+    external
+    view
+    returns (
         string memory topic,
         uint256 startTime,
         uint256 duration,
@@ -240,7 +242,8 @@ contract DebateFactory is ReentrancyGuard, OwnableRoles {
         address[] memory judges,
         bool hasOutcome,
         uint256 finalOutcome
-    ) {
+    )
+    {
         Debate storage debate = debates[debateId];
         return (
             debate.topic,
@@ -258,36 +261,27 @@ contract DebateFactory is ReentrancyGuard, OwnableRoles {
         );
     }
 
-    function getRoundInfo(uint256 debateId, uint256 roundNumber) 
-        external 
-        view 
-        returns (
-            bool isComplete,
-            uint256 judgeCount,
-            uint256[] memory totalScores,
-            uint256 startTime,
-            uint256 endTime
-        ) 
+    function getRoundInfo(
+        uint256 debateId,
+        uint256 roundNumber
+    )
+    external
+    view
+    returns (bool isComplete, uint256 judgeCount, uint256[] memory totalScores, uint256 startTime, uint256 endTime)
     {
         Round storage round = debates[debateId].rounds[roundNumber];
         totalScores = new uint256[](OUTCOME_COUNT);
         for (uint256 i = 0; i < OUTCOME_COUNT; i++) {
             totalScores[i] = round.totalScores[i];
         }
-        return (
-            round.isComplete,
-            round.judgeCount,
-            totalScores,
-            round.startTime,
-            round.endTime
-        );
+        return (round.isComplete, round.judgeCount, totalScores, round.startTime, round.endTime);
     }
 
-    function getJudgeScores(uint256 debateId, uint256 roundNumber, address judge) 
-        external 
-        view 
-        returns (uint256[] memory scores) 
-    {
+    function getJudgeScores(
+        uint256 debateId,
+        uint256 roundNumber,
+        address judge
+    ) external view returns (uint256[] memory scores) {
         scores = new uint256[](OUTCOME_COUNT);
         Round storage round = debates[debateId].rounds[roundNumber];
         for (uint256 i = 0; i < OUTCOME_COUNT; i++) {
@@ -325,7 +319,7 @@ contract DebateFactory is ReentrancyGuard, OwnableRoles {
         return probabilities;
     }
 
-// return debate structs
+    // return debate structs
     function getAllDebates() external view returns (uint256[] memory) {
         uint256[] memory debateIds = new uint256[](debateCount);
         for (uint256 i = 0; i < debateCount; i++) {
@@ -333,4 +327,5 @@ contract DebateFactory is ReentrancyGuard, OwnableRoles {
         }
         return debateIds;
     }
-} 
+}
+
