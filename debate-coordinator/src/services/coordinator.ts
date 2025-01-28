@@ -27,8 +27,8 @@ export class CoordinatorService {
     if (!process.env.WSS_RPC_URL) throw new Error('WSS_RPC_URL environment variable is not set');
 
     this.redis = new Redis({
-      host: 'localhost',
-      port: 6379,
+      host: process.env.REDIS_HOST || 'localhost',
+      port: Number(process.env.REDIS_PORT) || 6379,
       lazyConnect: true  // Don't connect immediately
     });
     this.agentClient = new AgentClient();
