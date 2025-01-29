@@ -138,25 +138,13 @@ export class ChatService {
 
   async facilitateDebateDiscussion(
     debateId: bigint,
-    gladiators: { name: string; agentId: string; index: number }[]
+    gladiators: { agentId: string; ipAddress: string; name: string }[]
   ): Promise<void> {
     // Get room ID for this debate
     const roomId = await this.getRoomIdByDebateId(debateId);
     if (!roomId) {
       throw new Error(`No chat room found for debate ${debateId}`);
     }
-
-    // Map contract addresses to agent IDs
-    const agentMap: { [address: string]: string } = {
-      // NOTE: is this inverted (the name on the left, the address on the right)? 
-      // Shouldn't it be `{ [agentId: string]: string}`?
-      // Because below you are indexing by agentId.
-      '0x1111111111111111111111111111111111111111': 'socrates',
-      '0x2222222222222222222222222222222222222222': 'plato',
-      '0x3333333333333333333333333333333333333333': 'aristotle',
-      '0x4444444444444444444444444444444444444444': 'marcus_aurelius',
-      '0x5555555555555555555555555555555555555555': 'seneca'
-    };
 
     // Send initial context message
     await this.sendMessage(
@@ -169,10 +157,10 @@ export class ChatService {
 
     while (true) {
       const currentGladiator = gladiators[currentSpeakerIndex];
-      const mappedAgentId = agentMap[currentGladiator.agentId.toLowerCase()];
+      const mappedAgentId = currentGladiator.agentId; // agentMap[currentGladiator.agentId.toLowerCase()];
 
       if (!mappedAgentId) {
-        console.error(`No agent ID mapping found for address ${currentGladiator.agentId}`);
+        console.error(`No agentId (${currentGladiator.agentId}) mapping found for address ${currentGladiator.ipAddress}`);
         currentSpeakerIndex = (currentSpeakerIndex + 1) % gladiators.length;
         continue;
       }
@@ -183,33 +171,27 @@ export class ChatService {
 
       if (lastMessage) {
         try {
-          console.log(`Attempting to send message to agent ${currentGladiator.name} (${currentGladiator.agentId}) -> ${mappedAgentId}`);
+          console.log(`Attempting to send message to agent ${currentGladiator.name}...`);
 
           // Send to current gladiator's agent server
           const response = await this.agentClient.sendMessage(
-            // TODO: can we use agentId here? Like, is this `agentMap[currenGladiator.name]`? 
-            // Or do we create the agentMap above with UUID as key? 
-            // If so, the values should be the address and name, or more info should be there?
-            "ebeabd78-5beb-01b2-a37b-38a7b31a8858",
+            {
+              ipAddress: currentGladiator.ipAddress,
+              agentId: currentGladiator.agentId
+            },
             {
               roomId: roomId,
-              userId: currentGladiator.name,
+              userId: currentGladiator.agentId,
               text: lastMessage.content
             }
           );
 
-          console.log(`Received response from agent ${mappedAgentId}:`, response);
+          console.log(`Received response from agent ${currentGladiator.name}:`, response);
 
           // Send response back to chat
-          await this.sendMessage(debateId, currentGladiator.name, response);
+          await this.sendMessage(debateId, currentGladiator.agentId, response);
         } catch (error) {
-          console.error(`Error communicating with agent ${currentGladiator.name}:`, error);
-          console.error('Agent details:', {
-            roomId,
-            address: currentGladiator.agentId,
-            mappedId: agentMap[currentGladiator.agentId.toLowerCase()],
-            name: currentGladiator.name
-          });
+          console.error(`Error communicating with agent ${currentGladiator.agentId}:`, error);
         }
       } else {
         console.log("there was no last message");
@@ -226,7 +208,7 @@ export class ChatService {
   /**
    * @param debateId - the debate in which the judge will decide the winner
    */
-  async sendMessagesToJudge(debateId: bigint): Promise<void> {
+  async sendMessagesToJudge(debateId: bigint, location: { judgeIpAddress: string, judgeAgentId: string, judgeName: string }): Promise<void> {
     // Get room ID for this debate
     const roomId = await this.getRoomIdByDebateId(debateId);
     if (!roomId) {
@@ -237,10 +219,13 @@ export class ChatService {
     const formatted_messages = messages.map((msg, _index, _array) => { return JSON.stringify({ sender: msg.sender, content: msg.content }) }).toString();
     // Send messages to judge agent.
     await this.agentClient.sendMessage(
-      "marcus_aurelius",
+      {
+        ipAddress: location.judgeIpAddress,
+        agentId: location.judgeAgentId,
+      },
       {
         roomId: roomId,
-        userId: "marcus_aiurelius",
+        userId: location.judgeName,
         text: formatted_messages,
       }
     );

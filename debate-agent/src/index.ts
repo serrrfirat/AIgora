@@ -68,6 +68,25 @@ export function createAgent(
   });
 }
 
+/**
+ * @param agentName - the name of the gladiator/agent
+ * @param content - the info to save
+ */
+function saveToFile(agentName: string, content: string) {
+  const folderName = "agent-information";
+  const folderPath = path.join(__dirname, "../characters", folderName);
+
+  if (!fs.existsSync(folderPath)) {
+    fs.mkdirSync(folderPath, { recursive: true });
+  }
+
+  const filePath = path.join(folderPath, agentName.replaceAll(" ", "_").toLowerCase());
+
+  fs.writeFileSync(filePath, content, { encoding: "utf8" });
+
+  elizaLogger.info(`Saved agentId to ${filePath}!`)
+}
+
 async function startAgent(character: Character, directClient: DirectClient) {
   try {
     character.id ??= stringToUuid(character.name);
@@ -95,6 +114,9 @@ async function startAgent(character: Character, directClient: DirectClient) {
 
     // report to console
     elizaLogger.debug(`Started ${character.name} as ${runtime.agentId}`);
+
+    // save agent's uuid to a file
+    saveToFile(character.name, runtime.agentId);
 
     return runtime;
   } catch (error) {
@@ -150,7 +172,6 @@ const startAgents = async () => {
     elizaLogger.warn(`Port ${serverPort} is in use, trying ${serverPort + 1}`);
     serverPort++;
   }
-  elizaLogger.info(`Port ${serverPort} used for `)
 
   // upload some agent functionality into directClient
   directClient.startAgent = async (character: Character) => {
@@ -164,9 +185,9 @@ const startAgents = async () => {
     elizaLogger.log(`Server started on alternate port ${serverPort}`);
   }
 
-  elizaLogger.log("Chat started. Type 'exit' to quit.");
-  const chat = startChat(characters);
-  chat();
+  //elizaLogger.log("Chat started. Type 'exit' to quit.");
+  //const chat = startChat(characters);
+  //chat();
 };
 
 startAgents().catch((error) => {

@@ -1,6 +1,6 @@
 interface AgentServer {
-  url: string;  // e.g., "http://localhost:3001"
   agentId: string;
+  url: string;  // e.g., "http://localhost:3001"
 }
 
 export class AgentClient {
@@ -14,14 +14,20 @@ export class AgentClient {
     this.agents.set(agentId, { url: serverUrl, agentId });
   }
 
-  async sendMessage(agentId: string, message: {
-    roomId: string,
-    userId: string,
-    text: string,
-    userName?: string
-  }) {
-    const agent = this.agents.get(agentId);
-    if (!agent) throw new Error(`Agent ${agentId} not found`);
+  async sendMessage(
+    location: {
+      ipAddress: string,
+      agentId: string,
+    },
+    message: {
+      roomId: string,
+      userId: string,
+      text: string,
+      userName?: string
+    }
+  ) {
+    //const agent = this.agents.get(location);
+    //if (!agent) throw new Error(`Agent ${location} not found`);
 
     try {
       const formData = new FormData();
@@ -29,19 +35,19 @@ export class AgentClient {
       formData.append("userId", message.userId);
       formData.append("roomId", `${message.roomId}`);
 
-      const response = await fetch(`${agent.url}/${agentId}/message`, {
+      const response = await fetch(`${location.ipAddress}/${location.agentId}/message`, {
         method: 'POST',
         body: formData
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to send message to agent ${agentId}: ${response.statusText}`);
+        throw new Error(`Failed to send message to agent ${location.ipAddress}/${location.agentId}/message: ${response.statusText}`);
       }
 
       const data = await response.json();
       return Array.isArray(data) ? data[0]?.text || '' : '';
     } catch (error) {
-      console.error(`Error communicating with agent ${agentId}:`, error);
+      console.error(`Error communicating with agent ${location}:`, error);
       throw error;
     }
   }

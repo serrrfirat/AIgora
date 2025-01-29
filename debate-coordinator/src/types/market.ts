@@ -1,16 +1,6 @@
 export type Gladiator = {
-  aiAddress: string;
-  name: string;
-  index: bigint;
-  isActive: boolean;
-  publicKey: string;
-};
-
-/**
- * The judge deciding who wins
- */
-export type Judge = {
-  aiAddress: string;
+  ipAddress: string;
+  agentId: string;
   name: string;
   index: bigint;
   isActive: boolean;

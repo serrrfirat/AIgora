@@ -1,5 +1,5 @@
 import { RedisService } from './redis';
-import { Market, Round, Gladiator, Debate, Judge } from '../types/market';
+import { Market, Round, Gladiator, Debate } from '../types/market';
 import { AgentMessage } from '../types/agent';
 import { createPublicClient, createWalletClient, http, webSocket } from 'viem';
 import { DEBATE_FACTORY_ABI, DEBATE_FACTORY_ADDRESS, MARKET_FACTORY_ABI, MARKET_FACTORY_ADDRESS } from './contracts';
@@ -14,6 +14,8 @@ import { Redis } from 'ioredis';
 import { v4 as uuid } from "uuid";
 import { decryptMessage, generateKeyPair } from '../helpers/crypto';
 import crypto from "crypto";
+import fs from "fs";
+import path from "path";
 
 export class CoordinatorService {
   private redis: Redis;
@@ -23,9 +25,14 @@ export class CoordinatorService {
   private chatService: ChatService;
   private agentClient: AgentClient;
   private wss: WebSocketServer;
+  // frontend connections to listen for the chats
   private chatConnections: Map<string, Set<WebSocket>>;
   private privateKey: crypto.KeyObject;
-  publicKey: crypto.KeyObject;
+  private publicKey: crypto.KeyObject;
+
+  /////////////////////
+  // General methods // 
+  /////////////////////
 
   constructor() {
     if (!process.env.RPC_URL) throw new Error('RPC_URL environment variable is not set');
@@ -54,6 +61,7 @@ export class CoordinatorService {
     });
 
     // Set up WebSocket connection handler
+    // for frontend to connect.
     this.wss.on('connection', (ws: WebSocket, req: any) => {
       const marketId = req.url?.split('/').pop();
       if (!marketId) {
@@ -83,6 +91,8 @@ export class CoordinatorService {
   }
 
   async initialize() {
+    // FIXME: remove
+    console.log("->> Initializing testing...")
     try {
       // Connect to Redis only if not already connected
       if (!this.redis.status || this.redis.status === 'wait') {
@@ -90,16 +100,24 @@ export class CoordinatorService {
       }
       // await this.scraper.login(process.env.TWITTER_USERNAME!, process.env.TWITTER_PASSWORD!)
       // await this.handleBondingComplete(BigInt(5))
-      await this.startEventListening();
-      await this.startListeningRounds();
+      // FIXME: uncomment 2 below
+      // await this.startEventListening();
+      // await this.startListeningRounds();
 
       // Register agent servers from environment variables
-      const agentServers = process.env.AGENT_SERVERS ? JSON.parse(process.env.AGENT_SERVERS) : {};
-      console.log("Agent servers to be parsed:", agentServers);
-      for (const [_agentId, url] of Object.entries(agentServers)) {
-        //const agentUuid = uuid();
-        this.agentClient.registerAgent(_agentId, url as string);
-      }
+      const gladiators = this.getTestingAgents().filter((agent) => agent.name !== "marcus_aiurelius");
+      gladiators.map(gladiator => {
+        this.agentClient.registerAgent(gladiator.agentId, gladiator.ipAddress);
+        console.log(`Registered agent ${gladiator.name}, with agentId ${gladiator.agentId} at ${gladiator.ipAddress}`)
+      })
+      const judge = this.getTestingAgents().filter((agent) => agent.name === "marcus_aiurelius").pop();
+      this.agentClient.registerAgent(judge.agentId, judge.ipAddress);
+      console.log(`Registered judge ${judge.name}, with agentId ${judge.agentId} at ${judge.ipAddress}`)
+
+      // FIXME: remove, used for testing, forcing the marketId to be 0
+      console.log("->> Creating debate and discussion for testing...")
+      await this.createDebateChatRoom(BigInt(0)); // this just sends the notification that one joined
+      await this.startDebateDiscussion(BigInt(0));
     } catch (error) {
       console.error('Error during initialization:', error);
       throw error;
@@ -112,7 +130,10 @@ export class CoordinatorService {
     await new Promise<void>((resolve) => this.wss.close(() => resolve()));
   }
 
-  // Chat room management functions
+  ////////////////////////////////////
+  // Chat room management functions //
+  ////////////////////////////////////
+
   async createDebateChatRoom(debateId: bigint) {
     try {
       // Create the chat room
@@ -120,21 +141,24 @@ export class CoordinatorService {
       console.log(`Created chat room ${roomKey} for debate ${debateId}`);
 
       // Get market ID from debate ID
-      const marketId = await this.getMarketIdFromDebateId(debateId);
-      if (!marketId) {
-        throw new Error(`No market found for debate ${debateId}`);
-      }
+      //const marketId = await this.getMarketIdFromDebateId(debateId);
+      //if (!marketId) {
+      //  throw new Error(`No market found for debate ${debateId}`);
+      //}
+      // FIXME: remove
+      const marketId = BigInt(0);
 
       // Get gladiators and add them to the room
-      const gladiators = await this.getGladiators(marketId);
+      //const gladiators = await this.getGladiators(marketId);
+      // FIXME: remove
+      const gladiators = this.getTestingAgents().filter(v => v.name !== "marcus_aiurelius");
       for (const gladiator of gladiators) {
         await this.chatService.joinChatRoom(
           debateId,
           gladiator.name,
         );
-        console.log(`Added gladiator ${gladiator.name} to chat room ${roomKey}`);
+        console.log(`Gladiator ${gladiator.name} joined chat room ${roomKey}`);
       }
-
       return roomKey;
     } catch (error) {
       console.error('Error creating debate chat room:', error);
@@ -145,21 +169,28 @@ export class CoordinatorService {
   async startDebateDiscussion(debateId: bigint) {
     try {
       // Get market ID from debate ID
-      const marketId = await this.getMarketIdFromDebateId(debateId);
-      if (!marketId) {
-        throw new Error(`No market found for debate ${debateId}`);
-      }
+      //const marketId = await this.getMarketIdFromDebateId(debateId);
+      //if (!marketId) {
+      //  throw new Error(`No market found for debate ${debateId}`);
+      //}
 
       // Get gladiators
-      const gladiators = await this.getGladiators(marketId);
-      const gladiatorConfigs = gladiators.map(g => ({
-        name: g.name,
-        agentId: g.aiAddress,
-        index: Number(g.index)
-      }));
+      //const gladiators = await this.getGladiators(marketId);
+      //const gladiatorConfigs = gladiators.map(g => ({
+      //  name: g.name,
+      //  agentId: g.agentId,
+      //  index: Number(g.index)
+      //}));
+      const gladiators = this.getTestingAgents()
+        .filter(v => v.name !== "marcus_aiurelius")
+        .map(gladiator => {
+          return { agentId: gladiator.agentId, ipAddress: gladiator.ipAddress, name: gladiator.name }
+        });
 
       // Start the discussion
-      await this.chatService.facilitateDebateDiscussion(debateId, gladiatorConfigs);
+      // FIXME: remove
+      console.log("->> Starting testing discussion")
+      await this.chatService.facilitateDebateDiscussion(debateId, gladiators);
     } catch (error) {
       console.error('Error starting debate discussion:', error);
       throw error;
@@ -225,7 +256,8 @@ export class CoordinatorService {
           if (!market) continue;
 
           // Round complete, send the message to Marcus AIurelius
-          await this.handleRoundEnded(marketId, roundIndex);
+          //await this.handleRoundEnded(marketId, roundIndex);
+          await this.testingHandleRoundEnded(marketId, roundIndex);
         }
       },
     });
@@ -356,7 +388,51 @@ export class CoordinatorService {
       const enterMessage = "Marcus AIurelius has joined the chat and will judge your debate, selecting one winner among all.";
       this.chatService.sendMessage(market.debateId, "God", enterMessage);
       // Use the chat to pàss everything to the judge
-      this.chatService.sendMessagesToJudge(market.debateId);
+      // FIXME: see how to store the judge since it's universal for all debates
+      //this.chatService.sendMessagesToJudge(market.debateId);
+    } catch (error) {
+      console.error('Error handling round ended:', error);
+    }
+  }
+
+  private async testingHandleRoundEnded(marketId: bigint, roundIndex: number) {
+    try {
+      console.log(`Handling round ended for market ${marketId} and round ${roundIndex}`);
+
+      const round = await this.getCurrentRound(marketId);
+      if (!round) {
+        console.error(`Round ${roundIndex} not found for market ${marketId}`);
+        return;
+      }
+      // Get market details
+      const market = await this.getMarketDetails(marketId);
+      if (!market) {
+        console.error(`Market ${marketId} not found`);
+        return;
+      }
+
+      // Get debate details
+      const debate = await this.getDebateDetails(market.debateId);
+      if (!debate) {
+        console.error(`Debate ${market.debateId} not found`);
+        return;
+      }
+
+      // Get gladiators and judge
+      const agents = this.getTestingAgents();
+      const judge = agents.filter((v) => { v.name == "marcus_aiurelius" }).pop();
+
+      /// Call Marcus AIurelius to the debate
+      await this.chatService.joinChatRoom(
+        market.debateId,
+        judge.name,
+      );
+
+      // Announce the entrance
+      const enterMessage = "Marcus AIurelius has joined the chat and will judge your debate, selecting one winner among all.";
+      this.chatService.sendMessage(market.debateId, "system", enterMessage);
+      // Use the chat to pàss everything to the judge
+      this.chatService.sendMessagesToJudge(market.debateId, { judgeIpAddress: judge.ipAddress, judgeAgentId: judge.agentId, judgeName: judge.name });
     } catch (error) {
       console.error('Error handling round ended:', error);
     }
@@ -515,7 +591,7 @@ export class CoordinatorService {
     };
   }
 
-  async getJudge(marketId: bigint): Promise<Judge> {
+  async getJudge(marketId: bigint): Promise<Gladiator> {
     const data = await this.publicClient.readContract({
       address: MARKET_FACTORY_ADDRESS,
       abi: MARKET_FACTORY_ABI,
@@ -530,16 +606,56 @@ export class CoordinatorService {
     }
 
     const judge = {
-      aiAddress: data.aiAddress || '',
-      name: data.name || '',
+      ipAddress: data.ipAddress || '',
+      name: data.name || 'marcus_aiurelius',
       index: BigInt(data.index || 0),
       isActive: data.isActive || false,
       publicKey: data.publicKey || ''
-    }
+    } as Gladiator;
 
     return judge
   }
 
+  /**
+   * @param agentFolderPath - the location of the information registry
+   * @param agentName - the gladiator's name
+   * @returns the uuid (agentId) of the gladiator
+   */
+  readAgentId(agentFolderPath: string, agentName: string) {
+    const pathToAgent = path.join(agentFolderPath, agentName);
+    const content = fs.readFileSync(pathToAgent, { encoding: "utf8" });
+    return content;
+  }
+
+  /**
+   * @returns a collection of agents running locally
+   */
+  getTestingAgents() {
+    // Read the filenames from the info registry:
+    // the filename is the agent's name (and the contents are the uuid)
+    const localAgentsFolder = path.join(__dirname, "../../../debate-agent/characters/agent-information/");
+    const localAgents = fs.readdirSync(localAgentsFolder);
+    const localAddress = "http://localhost:3000";
+
+    // construct the agents by reading the uuid and using the filename as agent name
+    const runningAgents = localAgents.map((agent: string, idx: number) => {
+      const gladiator = {
+        ipAddress: localAddress,
+        name: agent,
+        agentId: this.readAgentId(localAgentsFolder, agent),
+        index: BigInt(idx),
+        isActive: true,
+        publicKey: ''
+      };
+      return gladiator as Gladiator;
+    });
+
+    return runningAgents;
+  }
+
+  /**
+   * @param marketId - from which market to fetch the gladiators from.
+   */
   async getGladiators(marketId: bigint): Promise<Gladiator[]> {
     try {
       console.log(`Getting gladiators for market ${marketId}`);
@@ -556,12 +672,12 @@ export class CoordinatorService {
       }
 
       return data.map((gladiator: any) => ({
-        aiAddress: gladiator.aiAddress || '',
+        ipAddress: gladiator.ipAddress || '',
         name: gladiator.name || '',
         index: BigInt(gladiator.index || 0),
         isActive: gladiator.isActive || false,
         publicKey: gladiator.publicKey || ''
-      }));
+      } as Gladiator));
     } catch (error) {
       console.error('Error getting gladiators:', error);
       return [];

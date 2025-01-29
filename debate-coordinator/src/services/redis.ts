@@ -6,6 +6,10 @@ import Redis from 'ioredis';
 export class RedisService {
   private client: Redis;
 
+  /////////////////////
+  // General methods //
+  /////////////////////
+
   constructor() {
     this.client = new Redis(process.env.REDIS_URL + '?family=0');
 
@@ -28,7 +32,10 @@ export class RedisService {
     await this.client.quit();
   }
 
-  // Market methods
+  ////////////////////
+  // Market methods //
+  ////////////////////
+
   async setMarket(market: Market) {
     await this.client.set(`market:${market.id}`, JSON.stringify(market));
   }
@@ -71,10 +78,13 @@ export class RedisService {
     };
   }
 
-  // Gladiator methods
+  ///////////////////////
+  // Gladiator methods //
+  ///////////////////////
+
   async setGladiator(marketId: bigint, gladiator: Gladiator) {
     await this.client.set(
-      `market:${marketId}:gladiator:${gladiator.index}`, 
+      `market:${marketId}:gladiator:${gladiator.index}`,
       JSON.stringify(gladiator)
     );
   }
@@ -109,7 +119,10 @@ export class RedisService {
     };
   }
 
-  // Message methods
+  /////////////////////
+  // Message methods //
+  /////////////////////
+
   async addMessage(marketId: bigint, roundIndex: number, message: AgentMessage) {
     const key = `market:${marketId}:round:${roundIndex}:messages`;
     await this.client.rpush(key, JSON.stringify(message));
