@@ -10,7 +10,6 @@ import { AgentClient } from './agent-client';
 import { Scraper } from 'agent-twitter-client';
 import { WebSocketServer, WebSocket } from 'ws';
 import { Message } from '../types/message';
-import { Redis } from 'ioredis';
 import { v4 as uuid } from "uuid";
 import { decryptMessage, generateKeyPair } from '../helpers/crypto';
 import crypto from "crypto";
@@ -18,7 +17,7 @@ import fs from "fs";
 import path from "path";
 
 export class CoordinatorService {
-  private redis: Redis;
+  private db: RedisService;
   private publicClient;
   private wsClient;
   private scraper: Scraper;
@@ -38,12 +37,12 @@ export class CoordinatorService {
     if (!process.env.RPC_URL) throw new Error('RPC_URL environment variable is not set');
     if (!process.env.WSS_RPC_URL) throw new Error('WSS_RPC_URL environment variable is not set');
 
-    this.redis = new Redis(process.env.REDIS_URL + '?family=0');
+    this.db = new RedisService();
     this.agentClient = new AgentClient();
     this.wss = new WebSocketServer({ port: Number(process.env.WS_PORT) || 3004 });
     this.chatConnections = new Map();
     this.chatService = new ChatService(
-      this.redis,
+      this.db,
       this.agentClient,
       this.broadcastChatMessage.bind(this)
     );
@@ -91,18 +90,18 @@ export class CoordinatorService {
   }
 
   async initialize() {
-    // FIXME: remove
-    console.log("->> Initializing testing...")
     try {
       // Connect to Redis only if not already connected
-      if (!this.redis.status || this.redis.status === 'wait') {
-        await this.redis.connect();
+      const status = await this.db.status();
+      if (!status || status === 'wait') {
+        await this.db.connect();
       }
       // await this.scraper.login(process.env.TWITTER_USERNAME!, process.env.TWITTER_PASSWORD!)
       // await this.handleBondingComplete(BigInt(5))
       // FIXME: uncomment 2 below
       // await this.startEventListening();
       // await this.startListeningRounds();
+      this.db.removeAll()
 
       // Register agent servers from environment variables
       const gladiators = this.getTestingAgents().filter((agent) => agent.name !== "marcus_aiurelius");
@@ -115,7 +114,6 @@ export class CoordinatorService {
       console.log(`Registered judge ${judge.name}, with agentId ${judge.agentId} at ${judge.ipAddress}`)
 
       // FIXME: remove, used for testing, forcing the marketId to be 0
-      console.log("->> Creating debate and discussion for testing...")
       await this.createDebateChatRoom(BigInt(0)); // this just sends the notification that one joined
       await this.startDebateDiscussion(BigInt(0));
     } catch (error) {
@@ -125,7 +123,7 @@ export class CoordinatorService {
   }
 
   async cleanup() {
-    this.redis.disconnect();
+    this.db.disconnect();
     await this.wsClient.destroy();
     await new Promise<void>((resolve) => this.wss.close(() => resolve()));
   }
@@ -181,16 +179,32 @@ export class CoordinatorService {
       //  agentId: g.agentId,
       //  index: Number(g.index)
       //}));
-      const gladiators = this.getTestingAgents()
+      const agents = this.getTestingAgents();
+      const gladiators = agents
         .filter(v => v.name !== "marcus_aiurelius")
         .map(gladiator => {
           return { agentId: gladiator.agentId, ipAddress: gladiator.ipAddress, name: gladiator.name }
         });
+      const judge = agents
+        .filter(v => v.name === "marcus_aiurelius")
+        .map(judge => {
+          return { agentId: judge.agentId, ipAddress: judge.ipAddress, name: judge.name }
+        }).pop();
 
       // Start the discussion
-      // FIXME: remove
-      console.log("->> Starting testing discussion")
       await this.chatService.facilitateDebateDiscussion(debateId, gladiators);
+
+      console.log(`\n\n
+                  /// - /// - /// - /// - /// - /// 
+                  ///     END OF THE DEBATE     ///
+                  /// - /// - /// - /// - /// - /// 
+                  \n\n`)
+
+      const { verdict: verdict, winner: winnerUuid } = await this.chatService.sendMessagesToJudge(debateId, { judgeAgentId: judge.agentId, judgeIpAddress: judge.ipAddress, judgeName: judge.name });
+      console.log(`\n\n\nReceived from > ${judge.name} < the following verdict:\n\t`, verdict);
+
+      const winnerGladiator = gladiators.filter(g => g.agentId === winnerUuid).pop();
+      console.log(`\n~~~ The winner thus is ${winnerGladiator.name} ~~~`)
     } catch (error) {
       console.error('Error starting debate discussion:', error);
       throw error;
@@ -257,7 +271,7 @@ export class CoordinatorService {
 
           // Round complete, send the message to Marcus AIurelius
           //await this.handleRoundEnded(marketId, roundIndex);
-          await this.testingHandleRoundEnded(marketId, roundIndex);
+          await this.testingHandleRoundEnded(marketId);
         }
       },
     });
@@ -395,44 +409,24 @@ export class CoordinatorService {
     }
   }
 
-  private async testingHandleRoundEnded(marketId: bigint, roundIndex: number) {
+  private async testingHandleRoundEnded(roomId: string) {
     try {
-      console.log(`Handling round ended for market ${marketId} and round ${roundIndex}`);
-
-      const round = await this.getCurrentRound(marketId);
-      if (!round) {
-        console.error(`Round ${roundIndex} not found for market ${marketId}`);
-        return;
-      }
-      // Get market details
-      const market = await this.getMarketDetails(marketId);
-      if (!market) {
-        console.error(`Market ${marketId} not found`);
-        return;
-      }
-
       // Get debate details
-      const debate = await this.getDebateDetails(market.debateId);
-      if (!debate) {
-        console.error(`Debate ${market.debateId} not found`);
-        return;
-      }
+      const debateId = BigInt(0)
 
       // Get gladiators and judge
       const agents = this.getTestingAgents();
-      const judge = agents.filter((v) => { v.name == "marcus_aiurelius" }).pop();
+      const judge = agents.filter((v) => v.name == "marcus_aiurelius").pop();
 
       /// Call Marcus AIurelius to the debate
-      await this.chatService.joinChatRoom(
-        market.debateId,
-        judge.name,
-      );
+      await this.chatService.joinChatRoom(debateId, judge.name);
 
       // Announce the entrance
       const enterMessage = "Marcus AIurelius has joined the chat and will judge your debate, selecting one winner among all.";
-      this.chatService.sendMessage(market.debateId, "system", enterMessage);
+      console.log("** Finished the debate, sending the debate to the judge and waiting for a verdict...")
+      await this.chatService.sendMessage(debateId, "system", enterMessage);
       // Use the chat to pàss everything to the judge
-      this.chatService.sendMessagesToJudge(market.debateId, { judgeIpAddress: judge.ipAddress, judgeAgentId: judge.agentId, judgeName: judge.name });
+      await this.chatService.sendMessagesToJudge(debateId, { judgeIpAddress: judge.ipAddress, judgeAgentId: judge.agentId, judgeName: judge.name });
     } catch (error) {
       console.error('Error handling round ended:', error);
     }

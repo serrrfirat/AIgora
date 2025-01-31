@@ -9,6 +9,7 @@
     "start:service:all": "pm2 start pnpm --name=\"all\" --restart-delay=3000 --max-restarts=10 -- run start:all",
     "stop:service:all": "pm2 stop all",
     "generate": "node src/utils/scrapper/twitter/index.js",
+    "generate:gladiators": "ts-node src/utils/generator.ts",
     "generate:judge": "ts-node src/utils/judgeGenerator.ts",
     "debug_generate": "DEBUG='puppeteer-cluster:*' node src/utils/scrapper/twitter/index.js"
   },

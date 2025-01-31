@@ -1,4 +1,4 @@
-import { createClient } from 'redis';
+//import { createClient } from 'redis';
 import { Market, Round, Gladiator } from '../types/market';
 import { AgentMessage, JudgeVerdict } from '../types/agent';
 import Redis from 'ioredis';
@@ -12,7 +12,6 @@ export class RedisService {
 
   constructor() {
     this.client = new Redis(process.env.REDIS_URL + '?family=0');
-
 
     this.client.on('error', (err) => {
       console.error('Redis Client Error:', err);
@@ -30,6 +29,30 @@ export class RedisService {
 
   async disconnect() {
     await this.client.quit();
+  }
+
+  ////////////////////
+  // General methods //
+  ////////////////////
+
+  async get(key: string) {
+    return await this.client.get(key);
+  }
+
+  async status() {
+    return this.client.status;
+  }
+
+  async rpush(key: string, value: string) {
+    return await this.client.rpush(key, value);
+  }
+
+  async lrange(key: string, start: number, end: number) {
+    return await this.client.lrange(key, start, end);
+  }
+
+  async set(key: string, value: string) {
+    return await this.client.set(key, value);
   }
 
   ////////////////////
@@ -137,5 +160,16 @@ export class RedisService {
   async getAllMessagesByMarketId(marketId: bigint): Promise<AgentMessage[]> {
     const data = await this.client.keys(`market:${marketId}:*`);
     return data.map(msg => JSON.parse(msg));
+  }
+
+  async removeMarketMessages(marketId: bigint): Promise<void> {
+    const data = await this.client.keys(`market:${marketId}*`);
+    await this.client.del(data);
+  }
+
+  async removeAll(): Promise<void> {
+    const data = await this.client.keys("*");
+    await this.client.del(data);
+    console.log("[REDIS] Removed all keys");
   }
 } 
