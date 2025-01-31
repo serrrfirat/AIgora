@@ -1,5 +1,6 @@
 export type Gladiator = {
-  aiAddress: string;
+  ipAddress: string;
+  agentId: string;
   name: string;
   index: bigint;
   isActive: boolean;

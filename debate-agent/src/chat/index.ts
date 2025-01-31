@@ -46,9 +46,21 @@ export function startChat(characters) {
     rl.question("You: ", async (input) => {
       await handleUserInput(input, agentId);
       if (input.toLowerCase() !== "exit") {
-        chat(); // Loop back to ask another question
       }
     });
+    chat(); // Loop back to ask another question
+  }
+
+  function allChat() {
+    for (const character of characters) {
+      const agentId = character.name ?? "Agent";
+      rl.question("You: ", async (input) => {
+        await handleUserInput(input, agentId);
+        if (input.toLowerCase() !== "exit") {
+        }
+      });
+    }
+    chat(); // Loop back to ask another question
   }
 
   return chat;
