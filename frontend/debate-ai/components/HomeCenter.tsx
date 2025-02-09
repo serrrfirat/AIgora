@@ -5,8 +5,8 @@ import PixelCard from "../components/PixelCard";
 const HomeCenter = () => {
   return (
     <>
-      <div className="flex justify-between">
-        <div>
+      <div className="flex justify-center">
+        <div className="hidden md:block">
           <Image
             src="/glad_left.webp"
             alt="Example image"
@@ -57,7 +57,7 @@ const HomeCenter = () => {
             </div>
           </div>
         </div>
-        <div>
+        <div className="hidden md:block">
           <Image
             src="/glad_right.webp"
             alt="Example image"

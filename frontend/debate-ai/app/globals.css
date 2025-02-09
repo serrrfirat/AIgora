@@ -188,3 +188,35 @@ body {
 .custom-scrollbar-main::-webkit-scrollbar-thumb:hover {
   background: #e3e2e2;
 }
+
+.navbar {
+  height: 3.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1rem;
+  /* bg-gray-900 */
+  background-image: url("../public/navbar.png");
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+@media (max-width: 1040px) {
+  .navbar {
+    background-image: none;
+    background: #2a1b15 !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .width-set {
+    width: 100%;
+  }
+}
+
+@media (max-width: 1024px) {
+  .width-debate-sidebar {
+    width: 90%;
+    left: -10px;
+  }
+}

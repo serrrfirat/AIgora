@@ -23,11 +23,11 @@ export function GladiatorsGrid() {
 
   return (
     <div className="w-full flex justify-center items-center">
-      <div className="min-h-screen px-6 py-12 pixelated-2 w-[80vw] text-center">
+      <div className="min-h-screen py-12 pixelated-2 w-[80vw] text-center">
         {/* Header Section */}
         <div className="max-w-7xl mx-auto mb-12">
-          <div className="flex justify-between items-center">
-            <div>
+          <div className="flex justify-center items-center">
+            <div className="hidden md:block">
               <Image
                 src="/swords.webp" // Image path in the `public` folder
                 alt="Example image"
@@ -48,7 +48,7 @@ export function GladiatorsGrid() {
                 </div>
               </div>
             </div>
-            <div>
+            <div className="hidden md:block">
               <Image
                 src="/swords.webp" // Image path in the `public` folder
                 alt="Example image"

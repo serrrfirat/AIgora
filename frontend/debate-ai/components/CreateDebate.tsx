@@ -26,6 +26,7 @@ import { Dialog, DialogContent } from "./ui/dialog";
 import { decodeEventLog, Log } from "viem";
 import { Sword, Clock, Users, MessageSquare } from "lucide-react";
 import Image from "next/image";
+import { Toaster, toast } from "sonner";
 
 const GLADIATOR_NAMES = [
   "Socrates",
@@ -54,14 +55,14 @@ const GLADIATOR_PUBLIC_KEYS = [
 const DEFAULT_BONDING_TARGET = BigInt(1000) * BigInt(10 ** 18);
 const DEFAULT_BONDING_DURATION = 7 * 24 * 60 * 60;
 const DEFAULT_BASE_PRICE = 100;
+const ROUNDS = "3";
+const JUDGEAI = "0x6AaE19C60cB5f933E9061d81a1C915c4A920abCC";
 
 export function CreateDebate() {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const [topic, setTopic] = useState("");
   const [duration, setDuration] = useState("1");
-  const [rounds, setRounds] = useState("3");
-  const [judgeAI, setJudgeAI] = useState("");
 
   const {
     data: debateHash,
@@ -85,16 +86,19 @@ export function CreateDebate() {
     hash: debateHash,
   });
 
-  const { isLoading: isConfirmingMarket } = useWaitForTransactionReceipt({
-    hash: marketHash,
-  });
+  const { isLoading: isConfirmingMarket, isSuccess: isMarketSuccess } =
+    useWaitForTransactionReceipt({
+      hash: marketHash,
+    });
 
   useEffect(() => {
     if (writeError) {
       console.error("Debate creation error:", writeError);
+      toast.error(`Debate creation error:`);
     }
     if (marketError) {
       console.error("Market creation error:", marketError);
+      toast.error(`Market creation error:`);
     }
   }, [writeError, marketError]);
 
@@ -108,14 +112,15 @@ export function CreateDebate() {
       args: [
         topic,
         BigInt(Number(duration) * 24 * 60 * 60),
-        BigInt(rounds),
-        [judgeAI],
+        BigInt(ROUNDS),
+        [JUDGEAI],
       ],
     });
   };
 
   useEffect(() => {
     if (isDebateSuccess && receipt?.logs && writeMarket) {
+      console.log("hit");
       try {
         const log = receipt.logs.find((log: Log) => {
           try {
@@ -123,6 +128,7 @@ export function CreateDebate() {
               abi: DEBATE_FACTORY_ABI,
               ...log,
             });
+            console.log("event", event);
             return event.eventName === "DebateCreated";
           } catch (error) {
             return false;
@@ -148,7 +154,7 @@ export function CreateDebate() {
             args: [
               MOCK_TOKEN_ADDRESS as `0x${string}`,
               decodedEvent.args.debateId,
-              judgeAI as `0x${string}`,
+              JUDGEAI as `0x${string}`,
               DEFAULT_BONDING_TARGET,
               DEFAULT_BONDING_DURATION,
               DEFAULT_BASE_PRICE,
@@ -159,7 +165,16 @@ export function CreateDebate() {
         console.error("Error creating market:", error);
       }
     }
-  }, [isDebateSuccess, receipt, writeMarket, judgeAI]);
+  }, [isDebateSuccess, receipt, writeMarket, JUDGEAI]);
+
+  useEffect(() => {
+    if (isDebateSuccess) {
+      toast.success("Debate successfully created!");
+    }
+    if (isMarketSuccess) {
+      toast.success("Market successfully created!");
+    }
+  }, [isDebateSuccess, isMarketSuccess]);
 
   const isPending =
     isDebatePending ||
@@ -168,7 +183,8 @@ export function CreateDebate() {
     isConfirmingMarket;
 
   return (
-    <div className="w-full max-w-md mx-auto relative">
+    <div className="w-full max-w-md mx-auto relative pixelated-2">
+      <Toaster position="bottom-right" expand={false} richColors closeButton />
       <Card className="bg-transparent border-2 border-[#9c9c9c] shadow-xl backdrop-blur-sm">
         <CardHeader className="space-y-1 pb-4">
           <div>
@@ -215,39 +231,6 @@ export function CreateDebate() {
                 className="bg-[#483535] border-[#D1BB9E]/20 text-[#f0ecec] placeholder:text-[#D1BB9E]/50 focus:border-[#cfcece] "
               />
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="rounds" className="text-[#3D3D3D]">
-                <div className="flex text-lg font-bold items-center gap-2">
-                  <Users className="w-5 h-5" />
-                  Number of Rounds
-                </div>
-              </Label>
-              <Input
-                id="rounds"
-                type="number"
-                value={rounds}
-                onChange={(e) => setRounds(e.target.value)}
-                min="1"
-                required
-                className="bg-[#483535] border-[#D1BB9E]/20 text-[#f0ecec] placeholder:text-[#D1BB9E]/50 focus:border-[#cfcece] "
-              />
-            </div>
-            <div className="space-y-1">
-              <Label
-                htmlFor="judgeAI"
-                className="text-[#3D3D3D] text-lg font-bold"
-              >
-                Judge AI Address
-              </Label>
-              <Input
-                id="judgeAI"
-                value={judgeAI}
-                onChange={(e) => setJudgeAI(e.target.value)}
-                placeholder="Enter Judge AI address"
-                required
-                className="bg-[#483535] border-[#D1BB9E]/20 text-[#f0ecec] placeholder:text-[#D1BB9E]/50 focus:border-[#cfcece] "
-              />
-            </div>
 
             <div className="relative">
               {!isConnected ? (
@@ -269,7 +252,7 @@ export function CreateDebate() {
                   {/* Transparent button */}
                   <button
                     type="submit"
-                    disabled={isPending || !judgeAI}
+                    disabled={isPending}
                     className="relative w-full p-4 bg-transparent text-[#ffffff] font-semibold disabled:bg-transparent disabled:text-[#c3c2c2] transition-colors duration-200"
                   >
                     {isPending ? "Creating..." : "Create Debate with Market"}

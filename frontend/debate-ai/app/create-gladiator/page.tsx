@@ -1,9 +1,10 @@
 "use client";
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { CreateDebate } from "../../components/CreateDebate";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Toaster, toast } from "sonner";
 import {
   Card,
   CardContent,
@@ -50,7 +51,7 @@ interface GeneratedGladiator {
 const CreateGladiator = () => {
   const [gladiator, setGladiator] = useState<GeneratedGladiator | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [isLoading, setIsLoading] = useState(false);
   const [showMintingModal, setShowMintingModal] = useState(false);
   const [mintError, setMintError] = useState<string | null>(null);
 
@@ -60,6 +61,9 @@ const CreateGladiator = () => {
   const handleCopy = () => {
     navigator.clipboard.writeText(JSON.stringify(gladiator, null, 2));
     setCopied(true);
+    toast.success("JSON copied to clipboard", {
+      description: "The gladiator data has been copied to your clipboard.",
+    });
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -78,14 +82,23 @@ const CreateGladiator = () => {
     hash: txHash,
   });
   const coordinatorUrl = process.env.NEXT_PUBLIC_COORDINATOR_URL;
+
   async function handleSubmit(formData: FormData) {
-    const twitterHandle = formData.get("twitter")?.toString().replace("@", ""); // Remove @ if present
+    const twitterHandle = formData.get("twitter")?.toString().replace("@", "");
 
-    if (!twitterHandle) return;
+    if (!twitterHandle) {
+      toast.error("Twitter handle required", {
+        description:
+          "Please enter a valid Twitter handle to generate a gladiator.",
+      });
+      return;
+    }
 
-    startTransition(async () => {
+    setIsLoading(true);
+    setError(null);
+
+    const promise = async () => {
       try {
-        // Call the character generation endpoint
         const response = await fetch(
           `${coordinatorUrl}/api/character/generate`,
           {
@@ -102,61 +115,116 @@ const CreateGladiator = () => {
         }
 
         const characterData = await response.json();
-
-        // Transform the character data into the GeneratedGladiator format
         const gladiatorData: GeneratedGladiator = {
-          name: characterData.data.name,
+          name: characterData.name,
           image:
             process.env.NEXT_PUBLIC_DEFAULT_GLADIATOR_IMAGE ||
             "/placeholder-gladiator.png",
-          description: characterData.data.bio.join(" "),
-          speciality: characterData.data.topics[0] || "General Philosophy",
+          description: characterData.bio.join(" "),
+          speciality: characterData.topics[0] || "General Philosophy",
           stats: {
-            strength: Math.min(100, characterData.data.topics.length * 20),
-            agility: Math.min(100, characterData.data.postExamples.length * 5),
-            intelligence: Math.min(
-              100,
-              characterData.data.adjectives.length * 25
-            ),
+            strength: Math.min(100, characterData.topics.length * 20),
+            agility: Math.min(100, characterData.postExamples.length * 5),
+            intelligence: Math.min(100, characterData.adjectives.length * 25),
           },
-          ipfsUrl: characterData.data.ipfsUrl,
+          ipfsUrl: characterData.ipfsUrl,
         };
 
         setGladiator(gladiatorData);
-        setError(null);
+        return gladiatorData;
       } catch (e) {
-        setError(
-          e instanceof Error ? e.message : "Failed to generate gladiator"
-        );
+        const errorMessage =
+          e instanceof Error ? e.message : "Failed to generate gladiator";
+        setError(errorMessage);
+        throw new Error(errorMessage);
+      } finally {
+        setIsLoading(false);
       }
+    };
+
+    toast.promise(promise(), {
+      loading: "Generating your gladiator...",
+      success: (data) => `${data.name} has been generated successfully!`,
+      error: (err) => err.message,
     });
   }
 
   const handleMint = async () => {
-    if (!gladiator || !address || !isConnected) return;
+    if (!gladiator || !address || !isConnected) {
+      toast.error("Cannot mint gladiator", {
+        description:
+          "Please ensure your wallet is connected and a gladiator has been generated.",
+      });
+      return;
+    }
 
     try {
-      setShowMintingModal(true);
       setMintError(null);
 
       const publicKey = Math.floor(Math.random() * 1000000).toString(16);
+
+      // toast.promise(
+      //   writeContract({
+      //     address: MARKET_FACTORY_ADDRESS,
+      //     abi: MARKET_FACTORY_ABI,
+      //     functionName: "registerGladiator",
+      //     args: [
+      //       gladiator.name,
+      //       gladiator.ipfsUrl || "",
+      //       publicKey,
+      //     ],
+      //   }),
+      //   {
+      //     loading: 'Minting your gladiator NFT...',
+      //     success: 'Gladiator NFT minted successfully!',
+      //     error: (err) => `Failed to mint: ${err.message}`,
+      //   }
+      // );
+      // --------
+
+      // ----------
       await writeContract({
         address: MARKET_FACTORY_ADDRESS,
         abi: MARKET_FACTORY_ABI,
         functionName: "registerGladiator",
-        args: [
-          gladiator.name,
-          gladiator.ipfsUrl || "", // Use IPFS URL instead of raw data
-          publicKey,
-        ],
+        args: [gladiator.name, gladiator.ipfsUrl || "", publicKey],
       });
     } catch (e) {
-      setMintError(e instanceof Error ? e.message : "Failed to mint NFT");
+      const errorMessage =
+        e instanceof Error ? e.message : "Failed to mint NFT";
+      setMintError(errorMessage);
+      toast.error("Minting failed", {
+        description: errorMessage,
+      });
     }
   };
+
+  const toastShown = useRef({
+    confirming: false,
+    success: false,
+    error: false,
+  });
+
+  useEffect(() => {
+    if (isMintConfirming && !toastShown.current.confirming) {
+      toast.info("Transaction is being confirmed...");
+      toastShown.current.confirming = true;
+    }
+
+    if (isMintSuccess && !toastShown.current.success) {
+      toast.success("Minting successful!");
+      toastShown.current.success = true;
+    }
+
+    if (mintTxError && !toastShown.current.error) {
+      toast.error(`Transaction failed: ${mintTxError.message}`);
+      toastShown.current.error = true;
+    }
+  }, [isMintConfirming, isMintSuccess, mintTxError]);
+
   return (
-    <div className="min-h-screen w-full relative ">
-      {/* Content container */}
+    <div className="min-h-screen w-full relative">
+      <Toaster position="bottom-right" expand={false} richColors closeButton />
       <div className="relative w-full max-w-7xl mx-auto px-4 py-6 min-h-screen flex items-start justify-center">
         <div className="hidden lg:block fixed left-0 bottom-0 pixelated-2 z-0">
           <Image
@@ -169,7 +237,6 @@ const CreateGladiator = () => {
           />
         </div>
 
-        {/* Center Content - Full width on mobile, centered on desktop */}
         <div className="w-full lg:w-auto relative z-10">
           {!gladiator && (
             <div className="w-full max-w-md mx-auto relative">
@@ -209,23 +276,21 @@ const CreateGladiator = () => {
                         </div>
                       ) : (
                         <div className="relative">
-                          {/* Background image */}
                           <div className="absolute inset-0">
                             <Image
-                              src={"/rock_container.webp"} // Add your image path here
+                              src={"/rock_container.webp"}
                               alt={"Background"}
                               fill
                               className="w-full h-full object-cover rounded-md"
                             />
                           </div>
 
-                          {/* Transparent button */}
                           <button
                             type="submit"
-                            disabled={isPending}
+                            disabled={isLoading}
                             className="relative w-full p-4 bg-transparent text-[#ffffff] font-semibold disabled:bg-transparent disabled:text-[#c3c2c2] transition-colors duration-200"
                           >
-                            {isPending ? "Creating..." : "Generate Gladiator"}
+                            {isLoading ? "Creating..." : "Generate Gladiator"}
                           </button>
                         </div>
                       )}
@@ -396,7 +461,6 @@ const CreateGladiator = () => {
           )}
         </div>
 
-        {/* Right Image - Hidden on mobile */}
         <div className="hidden lg:block fixed right-0 bottom-0 z-0">
           <Image
             src="/side_2.webp"

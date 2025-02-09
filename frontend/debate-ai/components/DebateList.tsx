@@ -20,6 +20,16 @@ import {
   Users,
 } from "lucide-react";
 
+// Type for how bonding curve is returned from contract
+type BondingCurve = [
+  bigint, // target
+  bigint, // current
+  bigint, // basePrice
+  bigint, // currentPrice
+  boolean, // isFulfilled
+  bigint, // endTime
+];
+
 type DebateDetails = [
   string, // topic
   bigint, // startTime
@@ -32,7 +42,7 @@ type DebateDetails = [
   string, // market
   string[], // judges
   boolean, // hasOutcome
-  bigint // finalOutcome
+  bigint, // finalOutcome
 ];
 
 interface DebateWithId {
@@ -83,7 +93,7 @@ export function DebateList() {
     window.location.href = `/debate/${debateId}`;
   };
 
-  // Combine all data and sort
+  // Combined all data and sort
   const debates: DebateWithId[] = [];
   debateIds?.forEach((id, index) => {
     const details = debateDetails?.[index]?.result as DebateDetails | undefined;
@@ -102,10 +112,31 @@ export function DebateList() {
     setVisibleItems((prev) => prev + 6);
   };
 
+  const { data: bondingCurveDetailsList } = useReadContracts({
+    contracts: (marketIdsData || []).map((marketIdData) => ({
+      address: MARKET_FACTORY_ADDRESS,
+      abi: MARKET_FACTORY_ABI as unknown as Abi,
+      functionName: "getBondingCurveDetails",
+      args: marketIdData?.result ? [marketIdData.result] : undefined,
+    })),
+  });
+
+  const bondingCurveMap = new Map<string, BondingCurve>();
+
+  (marketIdsData || []).forEach((marketIdData, index) => {
+    const marketId = marketIdData.result?.toString();
+    const details = bondingCurveDetailsList?.[index]?.result as
+      | BondingCurve
+      | undefined;
+    if (marketId && details) {
+      bondingCurveMap.set(marketId, details);
+    }
+  });
+
   return (
     <div className="space-y-8 p-4 w-full flex flex-col items-center pixelated-2">
       <div className="grid w-[80vw] grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {visibleDebates.map(({ id: debateId, details, marketId }) => {
+        {visibleDebates.map(({ id: debateId, details, marketId }, index) => {
           if (!details) return null;
 
           const [
@@ -119,15 +150,36 @@ export function DebateList() {
             finalOutcome,
           ] = details;
 
+          // Fetch bonding curve details
+          const bondingCurveDetails = bondingCurveMap.get(marketId.toString());
+
+          const isFulfilled = bondingCurveDetails
+            ? bondingCurveDetails[4]
+            : false;
+
+          const endTime = bondingCurveDetails ? bondingCurveDetails[5] : 0n;
+
+          const timeRemaining = endTime
+            ? Math.max(0, Number(endTime) - Math.floor(Date.now() / 1000))
+            : 0;
+
+          const daysRemaining = Math.floor(timeRemaining / (24 * 60 * 60));
+          const hoursRemaining = Math.floor(
+            (timeRemaining % (24 * 60 * 60)) / 3600
+          );
+
+          let isDummyActive = true;
+          if (daysRemaining === 0 && hoursRemaining === 0) {
+            isDummyActive = false;
+          }
+
           return (
             <Card
               key={debateId.toString()}
               className="group p-6 bg-[#52362B] border-2 border-[#52362B] rounded-lg shadow-md hover:shadow-xl transition-all cursor-pointer overflow-hidden relative"
             >
               <div
-                className={`absolute top-0 right-0 w-20 h-20 -mt-10 -mr-10 rotate-45 ${
-                  isActive ? "bg-[#D1BB9E]" : "bg-red-500/20"
-                }`}
+                className={`absolute top-0 right-0 w-20 h-20 -mt-10 -mr-10 rotate-45 bg-[#D1BB9E]`}
               />
 
               <div className="flex flex-col gap-4">
@@ -145,15 +197,15 @@ export function DebateList() {
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="flex items-center gap-2">
-                      {isActive && (
+                      {isDummyActive && (
                         <div className="w-2 h-2 rounded-full bg-green-500 status-dot animate-blink" />
                       )}
                       <span
                         className={`text-sm ${
-                          isActive ? "text-green-400" : "text-red-400"
+                          isDummyActive ? "text-green-400" : "text-red-400"
                         }`}
                       >
-                        {isActive ? "Active" : "Completed"}
+                        {isDummyActive ? "Active" : "Completed"}
                       </span>
                     </div>
                   </div>
@@ -172,7 +224,37 @@ export function DebateList() {
                 </div>
 
                 <div className="h-[300px] border-t border-gray-800">
-                  <ChatWindow marketId={marketId} />
+                  {!isFulfilled ? (
+                    <div className="flex flex-col items-center justify-center py-1 px-4">
+                      <div className="w-16 h-16 bg-gradient-to-br from-[#2A1B15] to-[#3B2820] rounded-full flex items-center justify-center mb-2 mt-2 border border-[#D1BB9E]/20 shadow-lg">
+                        <div className="text-2xl">🤖</div>
+                      </div>
+                      <div className="text-center space-y-1 max-w-md">
+                        <h3 className="text-lg font-medium text-[#FFD700]">
+                          AI Agents are waiting to start
+                        </h3>
+                        <p className="text-sm text-[#E6D5C3] leading-relaxed">
+                          Once the bonding curve target is reached, three expert
+                          AI agents will begin analyzing and debating this topic
+                          in real-time.
+                        </p>
+                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#2A1B15] border border-[#D1BB9E]/20 shadow-inner">
+                          <div className="text-sm text-[#FFD700]">
+                            Progress:{" "}
+                            {bondingCurveDetails
+                              ? (
+                                  (Number(bondingCurveDetails[1]) * 100) /
+                                  Number(bondingCurveDetails[0])
+                                ).toFixed(1)
+                              : "0"}
+                            % to unlock
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <ChatWindow marketId={marketId} />
+                  )}
                 </div>
 
                 <div className="flex justify-between items-center">
