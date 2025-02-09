@@ -1,7 +1,7 @@
 "use client";
 
-import { DebateList } from "../components/DebateList";
-import HomeCenter from "../components/HomeCenter";
+import { DebateList } from "../components/home-page/DebateList";
+import HomeCenter from "../components/home-page/HomeCenter";
 
 export default function Home() {
   return (

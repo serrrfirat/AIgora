@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { ChevronRight, Shield, Sword } from "lucide-react";
-import { Button } from "./ui/button";
+import { Button } from "../ui/button";
 
 interface GladiatorProps {
   id: string;

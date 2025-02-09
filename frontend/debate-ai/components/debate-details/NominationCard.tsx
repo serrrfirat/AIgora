@@ -1,5 +1,5 @@
 import React from "react";
-import { NominateGladiatorCard } from "../NominateGladiatorCard";
+import { NominateGladiatorCard } from "./NominateGladiatorCard";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 

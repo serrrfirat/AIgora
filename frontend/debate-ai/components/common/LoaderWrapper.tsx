@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
-import Loader from "@/components/Loader";
+import Loader from "@/components/common/Loader";
 
 export default function LoaderWrapper({
   children,

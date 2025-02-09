@@ -184,7 +184,13 @@ export function CreateDebate() {
 
   return (
     <div className="w-full max-w-md mx-auto relative pixelated-2">
-      <Toaster position="bottom-right" expand={false} richColors closeButton />
+      <Toaster
+        position="bottom-right"
+        expand={false}
+        richColors
+        closeButton
+        className="!z-[999]"
+      />
       <Card className="bg-transparent border-2 border-[#9c9c9c] shadow-xl backdrop-blur-sm">
         <CardHeader className="space-y-1 pb-4">
           <div>

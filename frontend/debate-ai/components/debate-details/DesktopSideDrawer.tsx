@@ -243,11 +243,12 @@ const DesktopSideDrawer = ({
                     !selectedGladiator ||
                     parseFloat(amount) <= 0 ||
                     !isActive
-                      ? "bg-[#f0efef] text-[#3D3D3D]"
+                      ? "opacity-50 cursor-not-allowed"
                       : "bg-[#D1BB9E] hover:bg-[#D1BB9E]/90"
                   }`}
                   disabled={
                     !isConnected ||
+                    !isActive ||
                     !selectedGladiator ||
                     parseFloat(amount) <= 0 ||
                     isApprovePending ||
@@ -272,15 +273,17 @@ const DesktopSideDrawer = ({
                 >
                   {!isConnected
                     ? "Connect Wallet"
-                    : !selectedGladiator
-                      ? "Select Outcome"
-                      : parseFloat(amount) <= 0
-                        ? "Enter Amount"
-                        : isApprovePending || isApproveConfirming
-                          ? "Approving..."
-                          : isOrderPending || isOrderConfirming
-                            ? "Placing Order..."
-                            : `Place ${orderType === "buy" ? "Buy" : "Sell"} Order`}
+                    : !isActive
+                      ? "Debate Ended"
+                      : !selectedGladiator
+                        ? "Select Outcome"
+                        : parseFloat(amount) <= 0
+                          ? "Enter Amount"
+                          : isApprovePending || isApproveConfirming
+                            ? "Approving..."
+                            : isOrderPending || isOrderConfirming
+                              ? "Placing Order..."
+                              : `Place ${orderType === "buy" ? "Buy" : "Sell"} Order`}
                 </Button>
 
                 <p className="text-xs text-white text-center">

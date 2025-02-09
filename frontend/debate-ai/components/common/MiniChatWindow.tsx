@@ -147,7 +147,8 @@ export function ChatWindow({
 
     // Get the host from coordinator URL and use port 3004
     const wsHost = new URL(coordinatorUrl).hostname;
-    const ws = new WebSocket(`ws://${wsHost}:3004/${marketId}`);
+    console.log(wsHost);
+    const ws = new WebSocket(`wss://${wsHost}/${marketId}`);
     wsRef.current = ws;
 
     ws.onopen = () => {

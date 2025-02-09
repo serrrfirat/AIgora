@@ -1,8 +1,8 @@
 import "./globals.css";
 import "@rainbow-me/rainbowkit/styles.css";
 import { Providers } from "./providers";
-import LoaderWrapper from "../components/LoaderWrapper";
-import NavbarWrapper from "../components/NavbarWrapper";
+import LoaderWrapper from "../components/common/LoaderWrapper";
+import NavbarWrapper from "../components/common/NavbarWrapper";
 
 function RootLayout({ children }: { children: React.ReactNode }) {
   return (

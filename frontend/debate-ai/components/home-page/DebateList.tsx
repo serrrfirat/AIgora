@@ -6,10 +6,10 @@ import {
   MARKET_FACTORY_ADDRESS,
   MARKET_FACTORY_ABI,
 } from "@/config/contracts";
-import { Card } from "./ui/card";
+import { Card } from "../ui/card";
 import { formatAddress } from "@/lib/utils";
-import { Button } from "./ui/button";
-import { ChatWindow } from "./MiniChatWindow";
+import { Button } from "../ui/button";
+import { ChatWindow } from "../common/MiniChatWindow";
 import { type Abi } from "viem";
 import {
   Award,

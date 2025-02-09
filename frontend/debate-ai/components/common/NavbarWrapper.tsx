@@ -1,6 +1,6 @@
 "use client";
 
-import Loader from "@/components/Loader";
+import Loader from "@/components/common/Loader";
 import Navbar from "./Navbar";
 
 export default function NavbarWrapper({

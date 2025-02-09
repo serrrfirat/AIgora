@@ -1,6 +1,6 @@
 import React from "react";
 import Image from "next/image";
-import PixelCard from "../components/PixelCard";
+import PixelCard from "../common/PixelCard";
 
 const HomeCenter = () => {
   return (

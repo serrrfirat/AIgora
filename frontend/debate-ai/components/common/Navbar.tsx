@@ -257,7 +257,7 @@ const Navbar = () => {
             <div className="flex flex-col">
               <span className="text-[#FFD700] font-medium">Create Debate</span>
               <span className="text-sm text-[#D1BB9E]/60">
-                Start a new discussion
+                Start a new debate
               </span>
             </div>
           </button>

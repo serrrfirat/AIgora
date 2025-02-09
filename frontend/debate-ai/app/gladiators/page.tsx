@@ -1,5 +1,5 @@
 import React from "react";
-import { GladiatorsGrid } from "../../components/gladiators-grid";
+import { GladiatorsGrid } from "../../components/gladiators/gladiators-grid";
 
 const Gladiators = () => {
   return (

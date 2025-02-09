@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
-import { useAccount, useReadContract } from 'wagmi';
-import { Card } from './ui/card';
-import { Button } from './ui/button';
-import { MARKET_FACTORY_ADDRESS, MARKET_FACTORY_ABI } from '@/config/contracts';
-import { formatEther } from '@/lib/utils';
-import { BribeSubmission } from './BribeSubmission';
+import { useEffect, useState } from "react";
+import { useAccount, useReadContract } from "wagmi";
+import { Card } from "./ui/card";
+import { Button } from "./ui/button";
+import { MARKET_FACTORY_ADDRESS, MARKET_FACTORY_ABI } from "@/config/contracts";
+import { formatEther } from "@/lib/utils";
+import { BribeSubmission } from "./debate-details/BribeSubmission";
 
 type Gladiator = {
   aiAddress: string;
@@ -40,14 +40,16 @@ interface GladiatorViewProps {
 }
 
 export function GladiatorView({ marketId }: GladiatorViewProps) {
-  const [selectedGladiator, setSelectedGladiator] = useState<Gladiator | null>(null);
+  const [selectedGladiator, setSelectedGladiator] = useState<Gladiator | null>(
+    null
+  );
   const { isConnected } = useAccount();
 
   // Get gladiators
   const { data: gladiators } = useReadContract({
     address: MARKET_FACTORY_ADDRESS,
     abi: MARKET_FACTORY_ABI,
-    functionName: 'getGladiators',
+    functionName: "getGladiators",
     args: [marketId],
   });
 
@@ -55,7 +57,7 @@ export function GladiatorView({ marketId }: GladiatorViewProps) {
   const { data: currentRound } = useReadContract({
     address: MARKET_FACTORY_ADDRESS,
     abi: MARKET_FACTORY_ABI,
-    functionName: 'getCurrentRound',
+    functionName: "getCurrentRound",
     args: [marketId],
   });
 
@@ -63,23 +65,29 @@ export function GladiatorView({ marketId }: GladiatorViewProps) {
   const { data: leaderboardData } = useReadContract({
     address: MARKET_FACTORY_ADDRESS,
     abi: MARKET_FACTORY_ABI,
-    functionName: 'getLeaderboard',
+    functionName: "getLeaderboard",
     args: [marketId],
   });
 
   // Format leaderboard data
-  const leaderboard: LeaderboardEntry[] = leaderboardData 
-    ? (leaderboardData as [bigint[], bigint[]]) [0].map((score: bigint, i: number) => ({
-        gladiatorIndex: (leaderboardData as [bigint[], bigint[]])[1][i],
-        totalScore: score,
-        gladiator: (gladiators as Gladiator[])?.[Number((leaderboardData as [bigint[], bigint[]])[1][i])]
-      }))
+  const leaderboard: LeaderboardEntry[] = leaderboardData
+    ? (leaderboardData as [bigint[], bigint[]])[0].map(
+        (score: bigint, i: number) => ({
+          gladiatorIndex: (leaderboardData as [bigint[], bigint[]])[1][i],
+          totalScore: score,
+          gladiator: (gladiators as Gladiator[])?.[
+            Number((leaderboardData as [bigint[], bigint[]])[1][i])
+          ],
+        })
+      )
     : [];
 
   // Calculate time remaining in current round
-  const timeRemaining = currentRound && (currentRound as { endTime: bigint }).endTime > 0n
-    ? Number((currentRound as { endTime: bigint }).endTime) - Math.floor(Date.now() / 1000)
-    : 0;
+  const timeRemaining =
+    currentRound && (currentRound as { endTime: bigint }).endTime > 0n
+      ? Number((currentRound as { endTime: bigint }).endTime) -
+        Math.floor(Date.now() / 1000)
+      : 0;
 
   return (
     <div className="space-y-6">
@@ -90,7 +98,12 @@ export function GladiatorView({ marketId }: GladiatorViewProps) {
           <div className="space-y-2">
             <p>Round {(currentRound as RoundData).roundIndex.toString()}</p>
             <p>Time Remaining: {Math.max(0, timeRemaining)} seconds</p>
-            <p>Status: {(currentRound as RoundData).isComplete ? 'Complete' : 'In Progress'}</p>
+            <p>
+              Status:{" "}
+              {(currentRound as RoundData).isComplete
+                ? "Complete"
+                : "In Progress"}
+            </p>
           </div>
         ) : (
           <p>No active round</p>
@@ -104,7 +117,11 @@ export function GladiatorView({ marketId }: GladiatorViewProps) {
           {(gladiators as Gladiator[])?.map((gladiator: Gladiator) => (
             <Button
               key={gladiator.index.toString()}
-              variant={selectedGladiator?.index === gladiator.index ? "default" : "outline"}
+              variant={
+                selectedGladiator?.index === gladiator.index
+                  ? "default"
+                  : "outline"
+              }
               onClick={() => setSelectedGladiator(gladiator)}
               className="w-full p-4 h-auto"
             >
@@ -112,7 +129,8 @@ export function GladiatorView({ marketId }: GladiatorViewProps) {
                 <p className="font-bold">{gladiator.name}</p>
                 <p className="text-sm text-gray-400">{gladiator.model}</p>
                 <p className="text-xs text-gray-500">
-                  {gladiator.aiAddress.slice(0, 6)}...{gladiator.aiAddress.slice(-4)}
+                  {gladiator.aiAddress.slice(0, 6)}...
+                  {gladiator.aiAddress.slice(-4)}
                 </p>
               </div>
             </Button>
@@ -133,7 +151,9 @@ export function GladiatorView({ marketId }: GladiatorViewProps) {
                 <span className="font-bold">{index + 1}.</span>
                 <span>{entry.gladiator?.name}</span>
               </div>
-              <span className="font-mono">{entry.totalScore.toString()} pts</span>
+              <span className="font-mono">
+                {entry.totalScore.toString()} pts
+              </span>
             </div>
           ))}
         </div>
@@ -152,4 +172,4 @@ export function GladiatorView({ marketId }: GladiatorViewProps) {
       )}
     </div>
   );
-} 
+}

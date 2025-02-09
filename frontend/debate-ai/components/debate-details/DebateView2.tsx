@@ -18,14 +18,14 @@ import { useState, useEffect, useMemo } from "react";
 
 import { waitForTransactionReceipt } from "viem/actions";
 
-import BondingCurveComp from "./debate-details/BondingCurve";
-import DebateInfo from "./debate-details/DebateInfo";
-import { DebateDiscussion } from "./debate-details/DebateDiscussion";
+import BondingCurveComp from "./BondingCurve";
+import DebateInfo from "./DebateInfo";
+import { DebateDiscussion } from "./DebateDiscussion";
 
-import GladiatorListComp from "./debate-details/GladiatorList";
-import NominationCard from "./debate-details/NominationCard";
-import DesktopSideDrawer from "./debate-details/DesktopSideDrawer";
-import MobileSideDrawer from "./debate-details/MobileSideDrawer";
+import GladiatorListComp from "./GladiatorList";
+import NominationCard from "./NominationCard";
+import DesktopSideDrawer from "./DesktopSideDrawer";
+import MobileSideDrawer from "./MobileSideDrawer";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Toaster, toast } from "sonner";
 
