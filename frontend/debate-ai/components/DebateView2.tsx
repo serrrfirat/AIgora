@@ -639,16 +639,36 @@ export function DebateView2({ debateId }: DebateViewProps) {
   });
 
   useEffect(() => {
+    let toastId: any;
+    if (isNominateConfirming) {
+      console.log("Nomination is loading!");
+      toastId = toast.loading("Nomination transaction is getting confirmed..", {
+        id: "nomination-loading",
+      });
+    }
+
+    return () => {
+      if (toastId) {
+        toast.dismiss(toastId);
+      }
+    };
+  }, [isNominateConfirming]);
+
+  useEffect(() => {
     if (isNominateConfirmed) {
       console.log("Nomination confirmed");
-      toast.success("Nomination for your gladiator is confirmed!");
+      toast.success("Nomination for your gladiator is confirmed!", {
+        id: "nomination-success",
+      });
     }
   }, [isNominateConfirmed]);
 
   useEffect(() => {
     if (nominateTxError) {
-      console.log("Error in Nomination ");
-      toast.error("Error in Nomination for your gladiator!");
+      console.log("Error in Nomination");
+      toast.error("Error in Nomination for your gladiator!", {
+        id: "nomination-error",
+      });
     }
   }, [nominateTxError]);
 
